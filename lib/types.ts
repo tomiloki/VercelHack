@@ -5,8 +5,8 @@ export interface Activity {
   name: string
   icon: string
   type: ActivityType
-  points: number // positive = + points, treats = - points cost
-  duration?: number // in minutes
+  points: number
+  duration?: number
   category: string
   description?: string
 }
@@ -33,40 +33,38 @@ export interface DailyProgress {
 }
 
 export const DEFAULT_ACTIVITIES: Activity[] = [
-  // Positive activities
-  { id: '1', name: 'Ejercicio', icon: '💪', type: 'positive', points: 30, duration: 30, category: 'Movimiento', description: 'Cualquier tipo de ejercicio físico' },
-  { id: '2', name: 'Ducha fría', icon: '🚿', type: 'positive', points: 20, duration: 5, category: 'Bienestar', description: 'Activa tu sistema nervioso' },
-  { id: '3', name: 'Meditar', icon: '🧘', type: 'positive', points: 25, duration: 10, category: 'Mente', description: 'Calma tu mente' },
-  { id: '4', name: 'Tomar agua', icon: '💧', type: 'positive', points: 5, duration: 1, category: 'Salud', description: '1 vaso de agua' },
-  { id: '5', name: 'Sin celular mañana', icon: '📵', type: 'positive', points: 35, duration: 60, category: 'Digital', description: 'Primera hora sin pantallas' },
-  { id: '6', name: 'Caminar al sol', icon: '☀️', type: 'positive', points: 20, duration: 15, category: 'Naturaleza', description: 'Luz natural en la mañana' },
-  { id: '7', name: 'Lectura', icon: '📚', type: 'positive', points: 15, duration: 20, category: 'Mente', description: 'Leer algo que te guste' },
-  { id: '8', name: 'Dormir 8 horas', icon: '😴', type: 'positive', points: 40, category: 'Descanso', description: 'Descanso completo' },
-  { id: '9', name: 'Comida saludable', icon: '🥗', type: 'positive', points: 20, category: 'Nutrición', description: 'Una comida balanceada' },
-  { id: '10', name: 'Estiramientos', icon: '🙆', type: 'positive', points: 10, duration: 10, category: 'Movimiento', description: 'Flexibilidad y relajación' },
-  { id: '11', name: 'Journaling', icon: '✍️', type: 'positive', points: 15, duration: 10, category: 'Mente', description: 'Escribe tus pensamientos' },
-  { id: '12', name: 'Socializar', icon: '👋', type: 'positive', points: 25, duration: 30, category: 'Social', description: 'Conexión con otros' },
+  { id: '1', name: 'Move your body', icon: 'move', type: 'positive', points: 30, duration: 30, category: 'Movement', description: 'Any physical activity that activates your day' },
+  { id: '2', name: 'Cold shower', icon: 'shower', type: 'positive', points: 20, duration: 5, category: 'Reset', description: 'A short reset to build energy and intention' },
+  { id: '3', name: 'Meditation', icon: 'mind', type: 'positive', points: 25, duration: 10, category: 'Mind', description: 'Quiet time to lower noise and recover focus' },
+  { id: '4', name: 'Drink water', icon: 'water', type: 'positive', points: 5, duration: 1, category: 'Health', description: 'One glass of water' },
+  { id: '5', name: 'Screen-free morning', icon: 'phone', type: 'positive', points: 35, duration: 60, category: 'Digital', description: 'First hour without scrolling' },
+  { id: '6', name: 'Walk outside', icon: 'sun', type: 'positive', points: 20, duration: 15, category: 'Nature', description: 'Natural light and a short walk' },
+  { id: '7', name: 'Reading', icon: 'book', type: 'positive', points: 15, duration: 20, category: 'Mind', description: 'Read something useful or enjoyable' },
+  { id: '8', name: 'Sleep 8 hours', icon: 'sleep', type: 'positive', points: 40, category: 'Rest', description: 'Protect a full night of recovery' },
+  { id: '9', name: 'Balanced meal', icon: 'meal', type: 'positive', points: 20, category: 'Nutrition', description: 'One simple nourishing meal' },
+  { id: '10', name: 'Stretching', icon: 'stretch', type: 'positive', points: 10, duration: 10, category: 'Movement', description: 'Mobility and release' },
+  { id: '11', name: 'Journaling', icon: 'write', type: 'positive', points: 15, duration: 10, category: 'Mind', description: 'Write what is on your mind' },
+  { id: '12', name: 'Connect with someone', icon: 'social', type: 'positive', points: 25, duration: 30, category: 'Social', description: 'A short intentional connection' },
 
-  // Treats (cost points to use)
-  { id: '101', name: 'Videojuegos', icon: '🎮', type: 'treat', points: 30, duration: 60, category: 'Entretenimiento', description: 'Gaming controlado' },
-  { id: '102', name: 'Redes sociales', icon: '📱', type: 'treat', points: 15, duration: 30, category: 'Digital', description: 'Scroll consciente' },
-  { id: '103', name: 'Series/Películas', icon: '🎬', type: 'treat', points: 25, duration: 60, category: 'Entretenimiento', description: 'Un episodio o película' },
-  { id: '104', name: 'Snack dulce', icon: '🍫', type: 'treat', points: 20, category: 'Comida', description: 'Un gustito dulce' },
-  { id: '105', name: 'Comida rápida', icon: '🍔', type: 'treat', points: 35, category: 'Comida', description: 'Fast food ocasional' },
-  { id: '106', name: 'YouTube/TikTok', icon: '📺', type: 'treat', points: 20, duration: 45, category: 'Digital', description: 'Videos de entretenimiento' },
-  { id: '107', name: 'Compra capricho', icon: '🛍️', type: 'treat', points: 40, category: 'Compras', description: 'Algo que querías' },
-  { id: '108', name: 'Dormir tarde', icon: '🌙', type: 'treat', points: 25, category: 'Descanso', description: 'Una noche de trasnochar' },
+  { id: '101', name: 'Gaming session', icon: 'game', type: 'treat', points: 30, duration: 60, category: 'Entertainment', description: 'A conscious gaming block' },
+  { id: '102', name: 'Social media', icon: 'social', type: 'treat', points: 15, duration: 30, category: 'Digital', description: 'A bounded scroll break' },
+  { id: '103', name: 'Series or movie', icon: 'movie', type: 'treat', points: 25, duration: 60, category: 'Entertainment', description: 'One episode or movie block' },
+  { id: '104', name: 'Sweet snack', icon: 'snack', type: 'treat', points: 20, category: 'Food', description: 'A small personal treat' },
+  { id: '105', name: 'Fast food', icon: 'food', type: 'treat', points: 35, category: 'Food', description: 'A planned casual meal' },
+  { id: '106', name: 'YouTube or TikTok', icon: 'video', type: 'treat', points: 20, duration: 45, category: 'Digital', description: 'Entertainment videos with a limit' },
+  { id: '107', name: 'Small purchase', icon: 'shop', type: 'treat', points: 40, category: 'Shopping', description: 'Something small you wanted' },
+  { id: '108', name: 'Sleep late', icon: 'moon', type: 'treat', points: 25, category: 'Rest', description: 'A planned late night' },
 ]
 
 export const GOALS: UserGoal[] = [
-  { id: 'energy', name: 'Más energía', description: 'Quiero sentirme con más vitalidad durante el día', icon: '⚡' },
-  { id: 'focus', name: 'Mejor concentración', description: 'Necesito enfocarme más en mis tareas', icon: '🎯' },
-  { id: 'sleep', name: 'Dormir mejor', description: 'Quiero mejorar la calidad de mi sueño', icon: '😴' },
-  { id: 'stress', name: 'Reducir estrés', description: 'Me siento muy estresado/a últimamente', icon: '🧘' },
-  { id: 'motivation', name: 'Más motivación', description: 'Me cuesta arrancar con mis proyectos', icon: '🚀' },
-  { id: 'mood', name: 'Mejor ánimo', description: 'Quiero sentirme más positivo/a', icon: '😊' },
-  { id: 'habits', name: 'Crear hábitos', description: 'Quiero ser más consistente con mis rutinas', icon: '📅' },
-  { id: 'balance', name: 'Equilibrio digital', description: 'Paso mucho tiempo en pantallas', icon: '📵' },
+  { id: 'energy', name: 'More energy', description: 'I want to feel more active during the day', icon: 'E' },
+  { id: 'focus', name: 'Better focus', description: 'I want to concentrate on what matters', icon: 'F' },
+  { id: 'sleep', name: 'Better rest', description: 'I want to improve my sleep routine', icon: 'R' },
+  { id: 'stress', name: 'Less stress', description: 'I want a calmer day-to-day rhythm', icon: 'C' },
+  { id: 'motivation', name: 'More momentum', description: 'I want help getting started', icon: 'S' },
+  { id: 'mood', name: 'Better mood', description: 'I want more positive daily inputs', icon: 'M' },
+  { id: 'habits', name: 'Build habits', description: 'I want more consistency', icon: 'H' },
+  { id: 'balance', name: 'Digital balance', description: 'I want more intentional screen time', icon: 'D' },
 ]
 
 export const ACTIVITY_SUGGESTIONS: Record<string, string[]> = {

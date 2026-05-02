@@ -3,19 +3,20 @@ import { DM_Sans, Fraunces } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const dmSans = DM_Sans({ 
-  subsets: ["latin"],
-  variable: '--font-sans'
-});
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-sans',
+})
 
-const fraunces = Fraunces({ 
-  subsets: ["latin"],
-  variable: '--font-serif'
-});
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-serif',
+})
 
 export const metadata: Metadata = {
-  title: 'BalanceFlow - Gestiona tu bienestar hormonal',
-  description: 'Equilibra tu dopamina y cortisol con hábitos personalizados. Trackea actividades positivas y date gustitos de manera controlada.',
+  title: 'HabitQuest - Conversational wellbeing coach',
+  description:
+    'Plan your day with a conversational wellbeing coach, complete positive activities, and unlock conscious personal rewards.',
   generator: 'v0.app',
   icons: {
     icon: [
