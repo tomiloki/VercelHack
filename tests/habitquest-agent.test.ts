@@ -22,11 +22,11 @@ function createUsage() {
 test('agent instructions enforce collaborative coaching and responsible framing', () => {
   assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /collaborative coach/i)
   assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /Never promise medical outcomes, hormone regulation, cures, diagnoses, or treatment results\./i)
-  assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /use the available domain tools or explicitly request them/i)
+  assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /use the available domain tools/i)
 })
 
-test('agent can request a domain action through the tool loop', async () => {
-  const handledRequests: Array<{ action: string; reason: string }> = []
+test('agent can use a real planning tool through the tool loop', async () => {
+  const calls: Array<{ focus: string | null | undefined; maxItems: number | undefined }> = []
 
   const model = new MockLanguageModelV3({
     doGenerate: mockValues(
@@ -35,10 +35,10 @@ test('agent can request a domain action through the tool loop', async () => {
           {
             type: 'tool-call',
             toolCallId: 'call-1',
-            toolName: 'request_domain_action',
+            toolName: 'generateDailyPlan',
             input: JSON.stringify({
-              action: 'plan_today',
-              reason: 'The user asked for help planning today.',
+              focus: 'Más foco para la tarde',
+              maxItems: 3,
             }),
           },
         ],
@@ -62,14 +62,42 @@ test('agent can request a domain action through the tool loop', async () => {
 
   const agent = createHabitQuestAgent({
     model,
-    handleDomainAction: async (request) => {
-      handledRequests.push(request)
+    domainService: {
+      completeOnboarding: async () => {
+        throw new Error('not used')
+      },
+      generateDailyPlan: async (input) => {
+        calls.push({
+          focus: input.focus,
+          maxItems: input.maxItems,
+        })
 
-      return {
-        status: 'requested',
-        action: request.action,
-        reason: request.reason,
-      }
+        return {
+          ok: true,
+          data: {
+            planId: 'plan-1',
+            planDate: '2026-05-03',
+            status: 'active',
+            agentSummary: 'Plan generado.',
+            items: [],
+          },
+        }
+      },
+      logCheckIn: async () => {
+        throw new Error('not used')
+      },
+      completePlanItem: async () => {
+        throw new Error('not used')
+      },
+      redeemReward: async () => {
+        throw new Error('not used')
+      },
+      getTodaySummary: async () => {
+        throw new Error('not used')
+      },
+      updatePreferences: async () => {
+        throw new Error('not used')
+      },
     },
   })
 
@@ -78,10 +106,10 @@ test('agent can request a domain action through the tool loop', async () => {
   })
 
   assert.equal(model.doGenerateCalls.length, 2)
-  assert.equal(handledRequests.length, 1)
-  assert.deepEqual(handledRequests[0], {
-    action: 'plan_today',
-    reason: 'The user asked for help planning today.',
+  assert.equal(calls.length, 1)
+  assert.deepEqual(calls[0], {
+    focus: 'Más foco para la tarde',
+    maxItems: 3,
   })
   assert.match(result.text, /plan simple/i)
 })

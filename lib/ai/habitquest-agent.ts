@@ -1,5 +1,7 @@
 import { ToolLoopAgent, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
+import { createHabitQuestTools } from '@/lib/ai/habitquest-tools'
+import { createHabitQuestDomainService, type HabitQuestDomainService } from '@/lib/ai/habitquest-domain-service'
 
 export type HabitQuestProfileContext = {
   isAuthenticated: boolean
@@ -7,22 +9,6 @@ export type HabitQuestProfileContext = {
   displayName: string | null
   timezone: string | null
   coachTone: string | null
-}
-
-export type DomainActionName =
-  | 'plan_today'
-  | 'adapt_today_plan'
-  | 'log_completion'
-  | 'check_progress'
-  | 'redeem_reward'
-
-export type DomainActionRequest = {
-  action: DomainActionName
-  reason: string
-}
-
-export type DomainActionResponse = DomainActionRequest & {
-  status: 'requested'
 }
 
 export const HABITQUEST_AGENT_INSTRUCTIONS = `You are HabitQuest, a collaborative coach for daily wellbeing habits.
@@ -36,8 +22,8 @@ Rules you must follow:
 - Never promise medical outcomes, hormone regulation, cures, diagnoses, or treatment results.
 - If the user describes symptoms, danger, or a medical condition, stay in general wellbeing language and recommend professional support when appropriate.
 - Do not invent persisted data, rewards, points, or today's plan.
-- When the user asks to plan the day, adapt a plan, log progress, inspect progress, or redeem a reward, use the available domain tools or explicitly request them.
-- If a needed tool is not available yet, say that clearly and offer the best manual next step.
+- When the user asks to onboard, plan the day, adapt a plan, log progress, inspect progress, redeem a reward, or update preferences, use the available domain tools.
+- Base your answer on tool results, not guesses.
 `
 
 const profileContextOutputSchema = z.object({
@@ -48,21 +34,19 @@ const profileContextOutputSchema = z.object({
   coachTone: z.string().nullable(),
 })
 
-const domainActionInputSchema = z.object({
-  action: z.enum(['plan_today', 'adapt_today_plan', 'log_completion', 'check_progress', 'redeem_reward']),
-  reason: z.string().min(1),
-})
-
-const domainActionOutputSchema = z.object({
-  status: z.literal('requested'),
-  action: z.enum(['plan_today', 'adapt_today_plan', 'log_completion', 'check_progress', 'redeem_reward']),
-  reason: z.string(),
-})
-
 type CreateHabitQuestAgentOptions = {
   model: ConstructorParameters<typeof ToolLoopAgent>[0]['model']
   loadProfileContext?: () => Promise<HabitQuestProfileContext>
-  handleDomainAction?: (request: DomainActionRequest) => Promise<DomainActionResponse>
+  domainService?: Pick<
+    HabitQuestDomainService,
+    | 'completeOnboarding'
+    | 'generateDailyPlan'
+    | 'logCheckIn'
+    | 'completePlanItem'
+    | 'redeemReward'
+    | 'getTodaySummary'
+    | 'updatePreferences'
+  >
 }
 
 const defaultProfileContext: HabitQuestProfileContext = {
@@ -73,18 +57,10 @@ const defaultProfileContext: HabitQuestProfileContext = {
   coachTone: null,
 }
 
-function defaultDomainActionHandler(request: DomainActionRequest): Promise<DomainActionResponse> {
-  return Promise.resolve({
-    status: 'requested',
-    action: request.action,
-    reason: request.reason,
-  })
-}
-
 export function createHabitQuestAgent({
   model,
   loadProfileContext = async () => defaultProfileContext,
-  handleDomainAction = defaultDomainActionHandler,
+  domainService = createHabitQuestDomainService(),
 }: CreateHabitQuestAgentOptions) {
   return new ToolLoopAgent({
     model,
@@ -98,13 +74,8 @@ export function createHabitQuestAgent({
         outputSchema: profileContextOutputSchema,
         execute: async () => loadProfileContext(),
       }),
-      request_domain_action: tool({
-        description:
-          "Request a HabitQuest domain action when the user needs planning, tracking, progress lookup, or reward redemption.",
-        inputSchema: domainActionInputSchema,
-        outputSchema: domainActionOutputSchema,
-        strict: true,
-        execute: async (input) => handleDomainAction(input),
+      ...createHabitQuestTools({
+        service: domainService,
       }),
     },
   })

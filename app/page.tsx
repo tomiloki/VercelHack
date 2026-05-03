@@ -1,15 +1,20 @@
-'use client'
+import { AppShell } from '@/components/app-shell'
+import { AuthCard } from '@/components/auth-card'
+import { getAuthContext } from '@/lib/auth'
 
-import { useAppStore } from '@/lib/store'
-import { Onboarding } from '@/components/onboarding'
-import { Dashboard } from '@/components/dashboard'
+export const dynamic = 'force-dynamic'
 
-export default function Home() {
-  const { hasOnboarded } = useAppStore()
+export default async function Home() {
+  const auth = await getAuthContext()
 
-  if (!hasOnboarded) {
-    return <Onboarding />
+  if (!auth.isConfigured || !auth.user || !auth.profile) {
+    return <AuthCard isConfigured={auth.isConfigured} />
   }
 
-  return <Dashboard />
+  return (
+    <AppShell
+      profileId={auth.profile.id}
+      displayName={auth.profile.display_name ?? auth.user.email ?? 'Demo user'}
+    />
+  )
 }

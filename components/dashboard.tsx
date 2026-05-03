@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { BalanceMeter } from './balance-meter'
 import { ActivityCard } from './activity-card'
 import { AddActivityDialog } from './add-activity-dialog'
 import { useAppStore } from '@/lib/store'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -45,7 +47,13 @@ const demoPlan = [
   { activityId: '10', label: 'Stretch reset', note: 'Small recovery action to close the day.' },
 ]
 
-export function Dashboard() {
+type DashboardProps = {
+  profileId: string
+  displayName: string
+}
+
+export function Dashboard({ profileId, displayName }: DashboardProps) {
+  const router = useRouter()
   const { getTodayProgress, getAllActivities, customActivities, resetDay, setOnboarded, completeActivity } = useAppStore()
   const [activeTab, setActiveTab] = useState<'positive' | 'treats'>('positive')
 
@@ -87,6 +95,13 @@ export function Dashboard() {
   const positiveByCategory = groupByCategory(positiveActivities)
   const treatsByCategory = groupByCategory(treatActivities)
 
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setOnboarded(false)
+    router.refresh()
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur-xl">
@@ -97,7 +112,9 @@ export function Dashboard() {
             </div>
             <div>
               <h1 className="font-serif text-xl font-semibold leading-none text-foreground">HabitQuest</h1>
-              <p className="mt-1 text-xs text-muted-foreground">Conversational wellbeing dashboard</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {displayName} · profile {profileId.slice(0, 8)}
+              </p>
             </div>
           </div>
 
@@ -119,6 +136,7 @@ export function Dashboard() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setOnboarded(false)}>Back to onboarding</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>Sign out demo user</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
