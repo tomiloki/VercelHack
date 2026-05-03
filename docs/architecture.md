@@ -151,7 +151,7 @@ Creates or adapts today's plan.
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 V0_API_KEY=
 TELEGRAM_BOT_TOKEN=
@@ -159,7 +159,17 @@ WHATSAPP_ACCESS_TOKEN=
 WHATSAPP_VERIFY_TOKEN=
 ```
 
-For AI Gateway on Vercel, prefer Vercel-managed OIDC/env configuration when the project is linked.
+### Visibility rules
+
+- `NEXT_PUBLIC_*` variables are public by design and can be shipped to the browser bundle.
+- `SUPABASE_SERVICE_ROLE_KEY`, `V0_API_KEY`, `TELEGRAM_BOT_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, and `WHATSAPP_VERIFY_TOKEN` are server-only.
+- Never commit real secrets. `.env.example` documents keys only; real values belong in local `.env.local` or Vercel project settings.
+
+### Local and Vercel notes
+
+- Local development: copy `.env.example` into `.env.local` and fill only the variables needed for the slice you are testing.
+- Vercel deployment: load the same keys into Project Settings → Environment Variables and keep server-only values out of any `NEXT_PUBLIC_*` key.
+- For AI Gateway on Vercel, prefer Vercel-managed OIDC/env configuration when the project is linked.
 
 ## Hackathon decisions
 
