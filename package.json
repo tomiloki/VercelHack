@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test:ai": "tsx --test tests/habitquest-agent.test.ts tests/habitquest-tools.test.ts tests/chat-web-ui.test.tsx",
+    "test:ai": "tsx --test tests/habitquest-agent.test.ts tests/habitquest-tools.test.ts tests/chat-web-ui.test.tsx tests/habitquest-bot.test.ts",
     "test:supabase": "node --test tests/supabase-auth.integration.test.mjs"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 import { DEFAULT_ACTIVITIES, GOALS } from '@/lib/types'
 import { createClient as createSupabaseClient } from '@/lib/supabase/server'
-import { getAuthContext, type AuthContext, type HabitQuestProfile } from '@/lib/auth'
+import { getAuthContext, type HabitQuestProfile } from '@/lib/auth'
 
 export const COACH_TONES = ['collaborative', 'direct', 'calm'] as const
 export const CHECK_IN_INTENTS = ['progress', 'fatigue', 'replan', 'reward_request', 'reflection', 'other'] as const
@@ -156,7 +156,10 @@ export type UpdatePreferencesData = {
 
 type ServiceDependencies = {
   createClient?: typeof createSupabaseClient
-  getAuthContext?: () => Promise<AuthContext>
+  getProfileContext?: () => Promise<{
+    isConfigured: boolean
+    profile: HabitQuestProfile | null
+  }>
 }
 
 type ActivePlanRow = {
@@ -278,21 +281,30 @@ export function calculateWalletBalance(
 
 export class HabitQuestDomainService {
   private readonly createClient
-  private readonly getAuthContext
+  private readonly getProfileContext
 
-  constructor({ createClient = createSupabaseClient, getAuthContext: getAuth = getAuthContext }: ServiceDependencies = {}) {
+  constructor({ createClient = createSupabaseClient, getProfileContext }: ServiceDependencies = {}) {
     this.createClient = createClient
-    this.getAuthContext = getAuth
+    this.getProfileContext =
+      getProfileContext ??
+      (async () => {
+        const auth = await getAuthContext()
+
+        return {
+          isConfigured: auth.isConfigured,
+          profile: auth.profile,
+        }
+      })
   }
 
   private async requireProfile() {
-    const auth = await this.getAuthContext()
+    const auth = await this.getProfileContext()
 
     if (!auth.isConfigured) {
       return fail<{ profile: HabitQuestProfile }>('supabase_not_configured', 'Supabase no está configurado.')
     }
 
-    if (!auth.user || !auth.profile) {
+    if (!auth.profile) {
       return fail<{ profile: HabitQuestProfile }>('unauthorized', 'Necesitás iniciar sesión para usar las herramientas del agente.')
     }
 
