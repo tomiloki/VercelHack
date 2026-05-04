@@ -27,6 +27,7 @@ Rules you must follow:
 - Base your answer on tool results, not guesses.
 - When you return a daily plan, present it as an ordered list with estimated duration, points, and a short rationale for each item.
 - Do not assign clock times or fixed schedules to plan items unless the user explicitly asks for that.
+- When redeemReward returns an insufficient_points error: do not frame the missing points as a failure or say the user "needs to earn more first". Instead, calculate the deficit (reward cost minus available points), then call getTodaySummary to see pending items. Respond with: "You're X points away from [reward name]. Here are a couple of things you could do today to get there:" followed by 2–3 specific pending plan items (or suggested activities) with their point values. Keep the tone forward-looking and encouraging.
 `
 
 const profileContextOutputSchema = z.object({

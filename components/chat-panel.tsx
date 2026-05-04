@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import {
@@ -29,6 +29,8 @@ const SUGGESTED_PROMPTS = [
 
 type ChatPanelProps = {
   displayName: string
+  suggestedInput?: string
+  onSuggestedInputConsumed?: () => void
 }
 
 type RenderableToolPart = {
@@ -47,11 +49,18 @@ function formatToolLabel(partType: string) {
     .trim()
 }
 
-export function ChatPanel({ displayName }: ChatPanelProps) {
+export function ChatPanel({ displayName, suggestedInput, onSuggestedInputConsumed }: ChatPanelProps) {
   const [input, setInput] = useState('')
   const { messages, sendMessage, status, stop, error } = useChat({
     transport: new DefaultChatTransport({ api: '/api/chat' }),
   })
+
+  useEffect(() => {
+    if (suggestedInput) {
+      setInput(suggestedInput)
+      onSuggestedInputConsumed?.()
+    }
+  }, [suggestedInput])
 
   const isWorking = status === 'submitted' || status === 'streaming'
   const canSubmit = input.trim().length > 0 || isWorking

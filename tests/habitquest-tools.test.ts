@@ -739,3 +739,65 @@ test('wallet balance subtracts redeems from earned points', () => {
 
   assert.equal(balance, 30)
 })
+
+test('detectCheckInIntent returns reward_request when user mentions redeeming a reward', () => {
+  assert.equal(
+    detectCheckInIntent({ message: 'Quiero canjear mi recompensa de gaming.', energyLevel: undefined, stressLevel: undefined }),
+    'reward_request',
+  )
+  assert.equal(
+    detectCheckInIntent({ message: '¿Puedo usar mis puntos para un premio?', energyLevel: undefined, stressLevel: undefined }),
+    'reward_request',
+  )
+})
+
+test('redeemReward returns insufficient_points error when available balance is below cost', async () => {
+  const state: MockState = {
+    daily_plans: [],
+    daily_plan_items: [],
+    user_activities: [],
+    check_ins: [],
+    completions: [],
+    rewards: [
+      {
+        id: 'reward-1',
+        profile_id: 'profile-1',
+        name: 'Gaming session',
+        cost_points: 50,
+        status: 'active',
+      },
+    ],
+    wallet_transactions: [
+      {
+        id: 'wallet-1',
+        profile_id: 'profile-1',
+        type: 'earn',
+        points: 20,
+        reason: 'Existing points',
+      },
+    ],
+  }
+
+  const service = createHabitQuestDomainService({
+    createClient: async () => createMockSupabaseClient(state) as never,
+    getProfileContext: async () => ({
+      isConfigured: true,
+      profile: {
+        id: 'profile-1',
+        user_id: 'user-1',
+        display_name: 'Tomi',
+        timezone: 'America/Santiago',
+        coach_tone: 'collaborative',
+        created_at: '2026-05-04T08:00:00.000Z',
+        updated_at: '2026-05-04T08:00:00.000Z',
+      },
+    }),
+  })
+
+  const result = await service.redeemReward({ rewardId: 'reward-1' })
+
+  assert.equal(result.ok, false)
+  if (result.ok) return
+  assert.equal(result.error.code, 'insufficient_points')
+  assert.equal(state.wallet_transactions.length, 1, 'no redeem transaction should be created when balance is insufficient')
+})

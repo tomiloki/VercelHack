@@ -24,11 +24,16 @@ import { Plus, Sparkles, Zap } from 'lucide-react'
 
 const ICONS = ['🏃', '🧘', '💪', '🚿', '📚', '🌅', '🥗', '💧', '🎮', '🍫', '📱', '🎬', '🛍️', '☕', '🎵', '🌿', '🧠', '❤️']
 
-export function AddActivityDialog() {
+type AddActivityDialogProps = {
+  defaultType?: ActivityType
+  triggerLabel?: string
+}
+
+export function AddActivityDialog({ defaultType = 'positive', triggerLabel }: AddActivityDialogProps) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('✨')
-  const [type, setType] = useState<ActivityType>('positive')
+  const [type, setType] = useState<ActivityType>(defaultType)
   const [points, setPoints] = useState(20)
   const [duration, setDuration] = useState<number | undefined>(undefined)
   const [category, setCategory] = useState('')
@@ -53,7 +58,7 @@ export function AddActivityDialog() {
     // Reset form
     setName('')
     setIcon('✨')
-    setType('positive')
+    setType(defaultType)
     setPoints(20)
     setDuration(undefined)
     setCategory('')
@@ -65,7 +70,7 @@ export function AddActivityDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Plus className="w-4 h-4" />
-          Agregar actividad
+          {triggerLabel ?? 'Agregar actividad'}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

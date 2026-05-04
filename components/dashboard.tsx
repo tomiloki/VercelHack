@@ -1,12 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { BalanceMeter } from './balance-meter'
 import { ActivityCard } from './activity-card'
 import { AddActivityDialog } from './add-activity-dialog'
 import { ChatPanel } from './chat-panel'
+import { RewardsMarketplace } from './rewards-marketplace'
 import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -57,6 +58,7 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
   const router = useRouter()
   const { getTodayProgress, getAllActivities, customActivities, resetDay, completeActivity } = useAppStore()
   const [activeTab, setActiveTab] = useState<'positive' | 'treats'>('positive')
+  const [pendingCoachMessage, setPendingCoachMessage] = useState('')
 
   const scrollToCoachChat = () => {
     document.getElementById('coach-chat')?.scrollIntoView({
@@ -203,7 +205,6 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
 
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <BalanceMeter />
-
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
@@ -246,7 +247,20 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
         </section>
 
         <section>
-          <ChatPanel displayName={displayName} />
+          <ChatPanel
+            displayName={displayName}
+            suggestedInput={pendingCoachMessage}
+            onSuggestedInputConsumed={() => setPendingCoachMessage('')}
+          />
+        </section>
+
+        <section>
+          <RewardsMarketplace
+            onAskCoach={(message) => {
+              setPendingCoachMessage(message)
+              document.getElementById('coach-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+          />
         </section>
 
         <section>
