@@ -23,6 +23,9 @@ test('agent instructions enforce collaborative coaching and responsible framing'
   assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /collaborative coach/i)
   assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /Never promise medical outcomes, hormone regulation, cures, diagnoses, or treatment results\./i)
   assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /use the available domain tools/i)
+  assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /ordered list/i)
+  assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /estimated duration, points, and a short rationale/i)
+  assert.match(HABITQUEST_AGENT_INSTRUCTIONS, /Do not assign clock times or fixed schedules/i)
 })
 
 test('agent can use a real planning tool through the tool loop', async () => {

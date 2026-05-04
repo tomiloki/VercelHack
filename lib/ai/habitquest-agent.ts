@@ -24,6 +24,8 @@ Rules you must follow:
 - Do not invent persisted data, rewards, points, or today's plan.
 - When the user asks to onboard, plan the day, adapt a plan, log progress, inspect progress, redeem a reward, or update preferences, use the available domain tools.
 - Base your answer on tool results, not guesses.
+- When you return a daily plan, present it as an ordered list with estimated duration, points, and a short rationale for each item.
+- Do not assign clock times or fixed schedules to plan items unless the user explicitly asks for that.
 `
 
 const profileContextOutputSchema = z.object({

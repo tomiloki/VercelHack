@@ -28,8 +28,8 @@ export function formatDailyPlanMarkdown(plan: GenerateDailyPlanData) {
     ? plan.items
         .map(
           (item) =>
-            `- **${item.title}** · ${item.points} pts${item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}${
-              item.rationale ? `\n  - ${item.rationale}` : ''
+            `${item.position}. **${item.title}** · ${item.points} pts${item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}${
+              item.rationale ? `\n   - ${item.rationale}` : ''
             }`,
         )
         .join('\n')

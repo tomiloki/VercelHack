@@ -1,6 +1,6 @@
 import { createAgentUIStreamResponse, createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai'
 import { createHabitQuestAgent } from '@/lib/ai/habitquest-agent'
-import { createHabitQuestDomainService } from '@/lib/ai/habitquest-domain-service'
+import { createHabitQuestDomainService, type HabitQuestDomainService } from '@/lib/ai/habitquest-domain-service'
 import {
   extractLatestUserText,
   formatDailyPlanMarkdown,
@@ -12,10 +12,27 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-const gatewayModel = process.env.HABITQUEST_AGENT_MODEL ?? 'openai/gpt-5.4'
+const defaultGatewayModel = process.env.HABITQUEST_AGENT_MODEL ?? 'openai/gpt-5.4'
 
-async function buildFallbackReply(messages: UIMessage[]) {
-  const service = createHabitQuestDomainService()
+type ChatDomainService = Pick<
+  HabitQuestDomainService,
+  | 'completeOnboarding'
+  | 'generateDailyPlan'
+  | 'logCheckIn'
+  | 'completePlanItem'
+  | 'redeemReward'
+  | 'getTodaySummary'
+  | 'updatePreferences'
+>
+
+type ChatRouteDependencies = {
+  gatewayApiKey?: string
+  gatewayModel?: string
+  createDomainService?: () => ChatDomainService
+  createAgent?: (input: { model: string; domainService: ChatDomainService }) => ReturnType<typeof createHabitQuestAgent>
+}
+
+async function buildFallbackReply(messages: UIMessage[], service: Pick<ChatDomainService, 'generateDailyPlan' | 'getTodaySummary'>) {
   const latestUserText = extractLatestUserText(messages)
 
   if (isPlanRequest(latestUserText)) {
@@ -40,12 +57,15 @@ async function buildFallbackReply(messages: UIMessage[]) {
   return formatGenericCoachMarkdown(latestUserText)
 }
 
-async function createFallbackCoachResponse(messages: UIMessage[]) {
+async function createFallbackCoachResponse(
+  messages: UIMessage[],
+  service: Pick<ChatDomainService, 'generateDailyPlan' | 'getTodaySummary'>,
+) {
   const stream = createUIMessageStream({
     originalMessages: messages,
     execute: async ({ writer }) => {
       const textId = crypto.randomUUID()
-      const reply = await buildFallbackReply(messages)
+      const reply = await buildFallbackReply(messages, service)
 
       writer.write({ type: 'start' })
       writer.write({ type: 'text-start', id: textId })
@@ -59,18 +79,28 @@ async function createFallbackCoachResponse(messages: UIMessage[]) {
   return createUIMessageStreamResponse({ stream })
 }
 
-export async function POST(request: Request) {
-  const { messages }: { messages: UIMessage[] } = await request.json()
+export function createChatPostHandler({
+  gatewayApiKey = process.env.AI_GATEWAY_API_KEY,
+  gatewayModel = defaultGatewayModel,
+  createDomainService = () => createHabitQuestDomainService(),
+  createAgent = ({ model, domainService }) => createHabitQuestAgent({ model, domainService }),
+}: ChatRouteDependencies = {}) {
+  return async function POST(request: Request) {
+    const { messages }: { messages: UIMessage[] } = await request.json()
+    const service = createDomainService()
 
-  if (!process.env.AI_GATEWAY_API_KEY) {
-    return createFallbackCoachResponse(messages)
+    if (!gatewayApiKey) {
+      return createFallbackCoachResponse(messages, service)
+    }
+
+    const agent = createAgent({ model: gatewayModel, domainService: service })
+
+    return createAgentUIStreamResponse({
+      agent,
+      uiMessages: messages,
+      abortSignal: request.signal,
+    })
   }
-
-  const agent = createHabitQuestAgent({ model: gatewayModel })
-
-  return createAgentUIStreamResponse({
-    agent,
-    uiMessages: messages,
-    abortSignal: request.signal,
-  })
 }
+
+export const POST = createChatPostHandler()
