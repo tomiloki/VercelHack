@@ -15,6 +15,7 @@ export default async function Home() {
     <AppShell
       profileId={auth.profile.id}
       displayName={auth.profile.display_name ?? auth.user.email ?? 'Demo user'}
+      initialHasOnboarded={auth.hasCompletedOnboarding}
     />
   )
 }

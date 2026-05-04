@@ -1,197 +1,396 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
+import { Bot, ChevronRight, Clock3, Gift, MessageCircle, Sparkles, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { GOALS, ACTIVITY_SUGGESTIONS, DEFAULT_ACTIVITIES } from '@/lib/types'
-import { useAppStore } from '@/lib/store'
-import { Check, ChevronRight, Sparkles, Target, Gift, MessageCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  buildOnboardingPersistenceInput,
+  buildOnboardingSummary,
+  createEmptyOnboardingDraft,
+  parseAvailableMinutes,
+  resolveGoalSelection,
+  splitNaturalLanguageList,
+  type HabitQuestOnboardingDraft,
+} from '@/lib/ai/habitquest-onboarding'
+import { GOALS } from '@/lib/types'
 
-export function Onboarding() {
-  const [step, setStep] = useState(0)
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([])
-  const { setOnboarded, setSelectedGoals: saveGoals } = useAppStore()
+type OnboardingStep = 'displayName' | 'goals' | 'activities' | 'patterns' | 'time' | 'rewards' | 'review'
 
-  const toggleGoal = (goalId: string) => {
-    setSelectedGoals((prev) =>
-      prev.includes(goalId) ? prev.filter((goal) => goal !== goalId) : [...prev, goalId],
-    )
+type ChatMessage = {
+  role: 'assistant' | 'user'
+  text: string
+}
+
+const STEP_PROMPTS: Record<Exclude<OnboardingStep, 'review'>, string> = {
+  displayName:
+    'Hola. Soy HabitQuest. Antes de planificar nada, decime cómo querés que te llame.',
+  goals:
+    'Buenísimo. Ahora contame qué querés mejorar. Podés escribirlo en tus palabras o tocar algunos objetivos sugeridos.',
+  activities:
+    'Dale. ¿Qué actividades positivas te gustaría hacer más seguido? Escribilas separadas por coma.',
+  patterns:
+    '¿Qué patrones te gustaría moderar un poco? Ejemplo: scroll infinito, dormir tarde, picoteo, etc.',
+  time:
+    '¿Cuánto tiempo real tenés por día para invertir en estas acciones? Decímelo simple: 15, 30, 45, 60 minutos...',
+  rewards:
+    'Último paso: ¿qué recompensas personales te gustaría desbloquear? Ejemplo: un episodio, gaming, un café especial.',
+}
+
+function isSkipAnswer(input: string) {
+  return /^(no|ninguna|ninguno|nada|skip|paso)$/i.test(input.trim())
+}
+
+function UserBubble({ text }: { text: string }) {
+  return (
+    <div className="ml-auto max-w-[85%] rounded-3xl rounded-br-md bg-primary px-4 py-3 text-sm text-primary-foreground shadow-sm">
+      {text}
+    </div>
+  )
+}
+
+function AssistantBubble({ text }: { text: string }) {
+  return (
+    <div className="max-w-[90%] rounded-3xl rounded-bl-md border border-border bg-card px-4 py-3 text-sm text-foreground shadow-sm">
+      {text}
+    </div>
+  )
+}
+
+type OnboardingProps = {
+  onCompleted: () => void
+}
+
+export function Onboarding({ onCompleted }: OnboardingProps) {
+  const router = useRouter()
+  const [draft, setDraft] = useState<HabitQuestOnboardingDraft>(createEmptyOnboardingDraft)
+  const [step, setStep] = useState<OnboardingStep>('displayName')
+  const [input, setInput] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: 'assistant',
+      text: STEP_PROMPTS.displayName,
+    },
+  ])
+
+  const selectedGoals = draft.goalIds
+  const canSubmit = input.trim().length > 0 || (step === 'goals' && selectedGoals.length > 0)
+
+  const goalSuggestions = useMemo(
+    () => GOALS.map((goal) => ({ id: goal.id, label: goal.name, description: goal.description })),
+    [],
+  )
+
+  const handleGoalToggle = (goalId: string) => {
+    setDraft((current) => ({
+      ...current,
+      goalIds: current.goalIds.includes(goalId)
+        ? current.goalIds.filter((candidate) => candidate !== goalId)
+        : [...current.goalIds, goalId],
+    }))
   }
 
-  const handleComplete = () => {
-    saveGoals(selectedGoals)
-    setOnboarded(true)
+  const pushAssistantPrompt = (next: Exclude<OnboardingStep, 'review'>) => {
+    setMessages((current) => [...current, { role: 'assistant', text: STEP_PROMPTS[next] }])
   }
 
-  const suggestedActivities = selectedGoals
-    .flatMap((goal) => ACTIVITY_SUGGESTIONS[goal] || [])
-    .filter((value, index, array) => array.indexOf(value) === index)
-    .slice(0, 6)
-    .map((id) => DEFAULT_ACTIVITIES.find((activity) => activity.id === id))
-    .filter(Boolean)
+  const moveToReview = (updatedDraft: HabitQuestOnboardingDraft) => {
+    setStep('review')
+    setMessages((current) => [
+      ...current,
+      {
+        role: 'assistant',
+        text: `Perfecto. Te resumo lo que entendí:\n${buildOnboardingSummary(updatedDraft)}\n\nSi te cierra, completo el onboarding y te abro el dashboard.`,
+      },
+    ])
+  }
+
+  const handleConversationStep = () => {
+    const userText =
+      step === 'goals' && !input.trim().length && selectedGoals.length
+        ? selectedGoals
+            .map((goalId) => GOALS.find((goal) => goal.id === goalId)?.name)
+            .filter((value): value is string => Boolean(value))
+            .join(', ')
+        : input.trim()
+
+    if (!userText) return
+
+    setError(null)
+    setMessages((current) => [...current, { role: 'user', text: userText }])
+    setInput('')
+
+    if (step === 'displayName') {
+      setDraft((current) => ({ ...current, displayName: userText }))
+      setStep('goals')
+      pushAssistantPrompt('goals')
+      return
+    }
+
+    if (step === 'goals') {
+      const resolvedGoalIds = Array.from(new Set([...selectedGoals, ...resolveGoalSelection(userText)]))
+
+      if (!resolvedGoalIds.length) {
+        setMessages((current) => [
+          ...current,
+          {
+            role: 'assistant',
+            text: 'Todavía no pude mapear esos objetivos. Elegí alguno sugerido o decímelo más concreto, por ejemplo: foco, descanso, menos estrés.',
+          },
+        ])
+        return
+      }
+
+      setDraft((current) => ({ ...current, goalIds: resolvedGoalIds }))
+      setStep('activities')
+      pushAssistantPrompt('activities')
+      return
+    }
+
+    if (step === 'activities') {
+      const desiredActivities = isSkipAnswer(userText) ? [] : splitNaturalLanguageList(userText)
+      const updatedDraft = { ...draft, desiredActivities }
+
+      setDraft(updatedDraft)
+      setStep('patterns')
+      pushAssistantPrompt('patterns')
+      return
+    }
+
+    if (step === 'patterns') {
+      const avoidPatterns = isSkipAnswer(userText) ? [] : splitNaturalLanguageList(userText)
+      const updatedDraft = { ...draft, avoidPatterns }
+
+      setDraft(updatedDraft)
+      setStep('time')
+      pushAssistantPrompt('time')
+      return
+    }
+
+    if (step === 'time') {
+      const availableMinutes = parseAvailableMinutes(userText)
+
+      if (!availableMinutes) {
+        setMessages((current) => [
+          ...current,
+          {
+            role: 'assistant',
+            text: 'Necesito un tiempo más concreto. Por ejemplo: 15, 30, 45 o 60 minutos por día.',
+          },
+        ])
+        return
+      }
+
+      const updatedDraft = { ...draft, availableMinutes }
+      setDraft(updatedDraft)
+      setStep('rewards')
+      pushAssistantPrompt('rewards')
+      return
+    }
+
+    if (step === 'rewards') {
+      const desiredRewards = isSkipAnswer(userText) ? [] : splitNaturalLanguageList(userText)
+      const updatedDraft = { ...draft, desiredRewards }
+
+      setDraft(updatedDraft)
+      moveToReview(updatedDraft)
+    }
+  }
+
+  const handleCompleteOnboarding = async () => {
+    const payload = buildOnboardingPersistenceInput(draft)
+
+    if (!payload.goalIds.length) {
+      setError('Te falta al menos un objetivo para completar el onboarding.')
+      return
+    }
+
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/onboarding/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const result = (await response.json()) as { ok: boolean; error?: string }
+
+      if (!response.ok || !result.ok) {
+        setError(result.error ?? 'No pude guardar el onboarding.')
+        return
+      }
+
+      setMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          text: 'Listo. Ya persistí tus objetivos, actividades iniciales y recompensas. Vamos al dashboard.',
+        },
+      ])
+
+      router.refresh()
+      onCompleted()
+    } catch {
+      setError('Hubo un problema al guardar el onboarding.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 md:p-8">
-      <AnimatePresence mode="wait">
-        {step === 0 && (
-          <motion.div
-            key="welcome"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-xl space-y-8 text-center"
-          >
-            <div className="space-y-4">
-              <motion.div
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: 'spring' }}
-                className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/10"
-              >
-                <Sparkles className="h-10 w-10 text-primary" />
-              </motion.div>
-              <h1 className="text-balance font-serif text-4xl font-semibold text-foreground md:text-5xl">
-                Welcome to HabitQuest
+    <div className="min-h-screen bg-background px-4 py-6 md:px-8">
+      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <Card className="overflow-hidden border-primary/15 bg-gradient-to-br from-primary/12 via-card to-positive/10 p-6">
+          <div className="flex h-full flex-col justify-between">
+            <div>
+              <p className="inline-flex items-center gap-2 rounded-full bg-background/75 px-3 py-1 text-xs font-medium text-primary">
+                <Bot className="h-3.5 w-3.5" />
+                Conversational onboarding
+              </p>
+              <h1 className="mt-4 font-serif text-4xl font-semibold tracking-tight text-foreground">
+                El agente tiene que ser el producto.
               </h1>
-              <p className="text-pretty text-lg leading-relaxed text-muted-foreground">
-                A conversational wellbeing coach that helps you plan the day, complete positive actions,
-                and unlock conscious personal rewards.
+              <p className="mt-4 text-base leading-7 text-muted-foreground">
+                Acá no te hacemos clickear un formulario muerto. Primero hablamos, capturamos contexto útil y
+                recién después persistimos objetivos, actividades y recompensas.
               </p>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4 text-left">
-              <Card className="border-positive/20 bg-positive/10 p-4">
-                <Target className="mb-3 h-6 w-6 text-positive" />
-                <h3 className="font-medium text-foreground">Positive actions</h3>
-                <p className="text-sm text-muted-foreground">Earn points with small useful steps.</p>
-              </Card>
-              <Card className="border-treat/20 bg-treat/10 p-4">
-                <Gift className="mb-3 h-6 w-6 text-treat" />
-                <h3 className="font-medium text-foreground">Personal rewards</h3>
-                <p className="text-sm text-muted-foreground">Use earned points without guilt.</p>
-              </Card>
-            </div>
-
-            <Button onClick={() => setStep(1)} size="lg" className="w-full px-8 md:w-auto">
-              Start setup
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </motion.div>
-        )}
-
-        {step === 1 && (
-          <motion.div
-            key="goals"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-2xl space-y-6"
-          >
-            <div className="space-y-2 text-center">
-              <h2 className="font-serif text-3xl font-semibold text-foreground">What do you want to improve?</h2>
-              <p className="text-muted-foreground">Pick a few areas. The coach uses them to suggest your first plan.</p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {GOALS.map((goal) => (
-                <motion.button
-                  key={goal.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => toggleGoal(goal.id)}
-                  className={cn(
-                    'relative flex items-start gap-4 rounded-xl border-2 p-4 text-left transition-all',
-                    selectedGoals.includes(goal.id) ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50',
-                  )}
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
-                    {goal.icon}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-medium text-foreground">{goal.name}</h3>
-                    <p className="truncate text-sm text-muted-foreground">{goal.description}</p>
+              <div className="mt-6 space-y-3">
+                <div className="flex items-start gap-3 rounded-2xl bg-background/70 p-4">
+                  <Target className="mt-0.5 h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium text-foreground">Objetivos reales</p>
+                    <p className="text-sm text-muted-foreground">Foco, descanso, estrés, energía, hábitos, balance digital.</p>
                   </div>
-                  {selectedGoals.includes(goal.id) && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary"
-                    >
-                      <Check className="h-4 w-4 text-primary-foreground" />
-                    </motion.div>
-                  )}
-                </motion.button>
-              ))}
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl bg-background/70 p-4">
+                  <Clock3 className="mt-0.5 h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium text-foreground">Tiempo disponible</p>
+                    <p className="text-sm text-muted-foreground">Para sugerir pasos sostenibles en vez de humo aspiracional.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl bg-background/70 p-4">
+                  <Gift className="mt-0.5 h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium text-foreground">Recompensas conscientes</p>
+                    <p className="text-sm text-muted-foreground">Se guardan desde el onboarding para que el loop arranque completo.</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(0)}>
-                Back
-              </Button>
-              <Button onClick={() => setStep(2)} disabled={selectedGoals.length === 0} className="flex-1">
-                Continue
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          </motion.div>
-        )}
+            <p className="mt-6 text-sm text-muted-foreground">
+              Alcance chico, pero con una base sana: conversación primero, persistencia real después.
+            </p>
+          </div>
+        </Card>
 
-        {step === 2 && (
-          <motion.div
-            key="suggestions"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-2xl space-y-6"
-          >
-            <div className="space-y-2 text-center">
-              <h2 className="font-serif text-3xl font-semibold text-foreground">Your starter actions</h2>
-              <p className="text-muted-foreground">These are demo suggestions. The agent will adapt them during the day.</p>
+        <Card className="border-border/80 p-4">
+          <div className="mb-4 flex items-center justify-between gap-3 border-b border-border/70 pb-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Coach HabitQuest</p>
+              <p className="text-sm text-muted-foreground">Respondé en lenguaje natural. El coach guía el setup.</p>
             </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {suggestedActivities.map(
-                (activity, index) =>
-                  activity && (
-                    <motion.div
-                      key={activity.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-card p-4"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-positive/10 text-positive">
-                        <Sparkles className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-foreground">{activity.name}</h3>
-                        <p className="text-sm text-positive">+{activity.points} pts</p>
-                      </div>
-                    </motion.div>
-                  ),
-              )}
+            <div className="rounded-2xl bg-primary/10 p-3 text-primary">
+              <Sparkles className="h-5 w-5" />
             </div>
+          </div>
 
-            <Card className="border-dashed bg-muted/50 p-4">
-              <p className="text-center text-sm text-muted-foreground">
-                The dashboard is only the companion view. The real loop starts when you talk to the coach.
-              </p>
-            </Card>
+          <div className="space-y-3">
+            {messages.map((message, index) => (
+              <motion.div
+                key={`${message.role}-${index}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
+              >
+                {message.role === 'user' ? <UserBubble text={message.text} /> : <AssistantBubble text={message.text} />}
+              </motion.div>
+            ))}
+          </div>
 
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(1)}>
-                Back
-              </Button>
-              <Button onClick={handleComplete} className="flex-1">
-                Open dashboard
-                <MessageCircle className="ml-2 h-4 w-4" />
-              </Button>
+          {step === 'goals' && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {goalSuggestions.map((goal) => {
+                const selected = selectedGoals.includes(goal.id)
+                return (
+                  <Button
+                    key={goal.id}
+                    type="button"
+                    variant={selected ? 'default' : 'outline'}
+                    className="rounded-full"
+                    onClick={() => handleGoalToggle(goal.id)}
+                  >
+                    {goal.label}
+                  </Button>
+                )
+              })}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+
+          {step !== 'review' ? (
+            <div className="mt-4 space-y-3">
+              <Textarea
+                value={input}
+                onChange={(event) => setInput(event.currentTarget.value)}
+                placeholder={
+                  step === 'displayName'
+                    ? 'Ej: Tomi'
+                    : step === 'goals'
+                      ? 'Ej: quiero más foco y menos estrés'
+                      : step === 'activities'
+                        ? 'Ej: caminar 15 minutos, respirar profundo'
+                        : step === 'patterns'
+                          ? 'Ej: scroll infinito, acostarme tardísimo'
+                          : step === 'time'
+                            ? 'Ej: 30 minutos'
+                            : 'Ej: un episodio, un café especial'
+                }
+                rows={3}
+              />
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {step === 'goals'
+                    ? 'Podés escribir objetivos o combinarlos con los chips.'
+                    : 'Si no aplica, escribí “no”.'}
+                </p>
+                <Button onClick={handleConversationStep} disabled={!canSubmit}>
+                  Seguir
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <Card className="border-dashed bg-muted/50 p-4">
+                <p className="text-sm font-medium text-foreground">Resumen final</p>
+                <pre className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{buildOnboardingSummary(draft)}</pre>
+              </Card>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  Esto persiste objetivos, actividades iniciales y recompensas en Supabase.
+                </p>
+                <Button onClick={handleCompleteOnboarding} disabled={isSaving}>
+                  {isSaving ? 'Guardando...' : 'Completar onboarding'}
+                  <MessageCircle className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+        </Card>
+      </div>
     </div>
   )
 }

@@ -55,7 +55,7 @@ type DashboardProps = {
 
 export function Dashboard({ profileId, displayName }: DashboardProps) {
   const router = useRouter()
-  const { getTodayProgress, getAllActivities, customActivities, resetDay, setOnboarded, completeActivity } = useAppStore()
+  const { getTodayProgress, getAllActivities, customActivities, resetDay, completeActivity } = useAppStore()
   const [activeTab, setActiveTab] = useState<'positive' | 'treats'>('positive')
 
   const scrollToCoachChat = () => {
@@ -103,7 +103,6 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
   const handleSignOut = async () => {
     const supabase = createClient()
     await supabase.auth.signOut()
-    setOnboarded(false)
     router.refresh()
   }
 
@@ -140,7 +139,6 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
                   Reset demo day
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setOnboarded(false)}>Back to onboarding</DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut}>Sign out demo user</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

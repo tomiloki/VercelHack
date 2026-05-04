@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { isOnboardingComplete } from '@/lib/ai/habitquest-onboarding'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 
 export type HabitQuestProfile = {
@@ -16,6 +17,7 @@ export type AuthContext = {
   isConfigured: boolean
   user: User | null
   profile: HabitQuestProfile | null
+  hasCompletedOnboarding: boolean
 }
 
 const PROFILE_FIELDS = 'id, user_id, display_name, timezone, coach_tone, created_at, updated_at'
@@ -68,12 +70,33 @@ async function getOrCreateProfile(user: User): Promise<HabitQuestProfile> {
   return createdProfile
 }
 
+async function getOnboardingSnapshot(profileId: string) {
+  const supabase = await createClient()
+
+  const [{ count: goalCount }, { count: activityCount }, { count: rewardCount }] = await Promise.all([
+    supabase.from('goals').select('*', { count: 'exact', head: true }).eq('profile_id', profileId).eq('status', 'active'),
+    supabase
+      .from('user_activities')
+      .select('*', { count: 'exact', head: true })
+      .eq('profile_id', profileId)
+      .eq('status', 'active'),
+    supabase.from('rewards').select('*', { count: 'exact', head: true }).eq('profile_id', profileId).eq('status', 'active'),
+  ])
+
+  return {
+    goalCount: goalCount ?? 0,
+    activityCount: activityCount ?? 0,
+    rewardCount: rewardCount ?? 0,
+  }
+}
+
 export async function getAuthContext(): Promise<AuthContext> {
   if (!getSupabaseEnv().isConfigured) {
     return {
       isConfigured: false,
       user: null,
       profile: null,
+      hasCompletedOnboarding: false,
     }
   }
 
@@ -88,14 +111,17 @@ export async function getAuthContext(): Promise<AuthContext> {
       isConfigured: true,
       user: null,
       profile: null,
+      hasCompletedOnboarding: false,
     }
   }
 
   const profile = await getOrCreateProfile(user)
+  const onboardingSnapshot = await getOnboardingSnapshot(profile.id)
 
   return {
     isConfigured: true,
     user,
     profile,
+    hasCompletedOnboarding: isOnboardingComplete(onboardingSnapshot),
   }
 }

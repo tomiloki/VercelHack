@@ -40,6 +40,8 @@ export type CompleteOnboardingInput = {
   displayName?: string | null
   timezone?: string | null
   coachTone?: CoachTone | null
+  customActivityNames?: string[]
+  customRewardNames?: string[]
 }
 
 export type CompleteOnboardingData = {
@@ -402,9 +404,8 @@ export class HabitQuestDomainService {
 
     const { data: existingActivities, error: activitiesError } = await client
       .from('user_activities')
-      .select('id')
+      .select('id, name')
       .eq('profile_id', profile.id)
-      .limit(1)
 
     if (activitiesError) {
       return fail('persistence_error', `No pude leer las actividades del usuario: ${activitiesError.message}`)
@@ -427,11 +428,36 @@ export class HabitQuestDomainService {
       }
     }
 
+    const existingActivityNames = new Set((existingActivities ?? []).map((activity) => activity.name.toLowerCase()))
+    if (!(existingActivities?.length ?? 0)) {
+      buildActivitySeeds().forEach((activity) => existingActivityNames.add(activity.name.toLowerCase()))
+    }
+    const customActivitiesToInsert = (input.customActivityNames ?? [])
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .filter((name, index, array) => array.findIndex((candidate) => candidate.toLowerCase() === name.toLowerCase()) === index)
+      .filter((name) => !existingActivityNames.has(name.toLowerCase()))
+      .map((name) => ({
+        profile_id: profile.id,
+        name,
+        description: 'Actividad personalizada capturada durante el onboarding conversacional.',
+        category: 'Custom',
+        duration_minutes: null,
+        points: 15,
+        status: 'active',
+      }))
+
+    if (customActivitiesToInsert.length) {
+      const { error } = await client.from('user_activities').insert(customActivitiesToInsert)
+      if (error) {
+        return fail('persistence_error', `No pude guardar las actividades personalizadas: ${error.message}`)
+      }
+    }
+
     const { data: existingRewards, error: rewardsError } = await client
       .from('rewards')
-      .select('id')
+      .select('id, name')
       .eq('profile_id', profile.id)
-      .limit(1)
 
     if (rewardsError) {
       return fail('persistence_error', `No pude leer las recompensas del usuario: ${rewardsError.message}`)
@@ -451,6 +477,32 @@ export class HabitQuestDomainService {
       const { error } = await client.from('rewards').insert(rewardSeeds)
       if (error) {
         return fail('persistence_error', `No pude crear las recompensas iniciales: ${error.message}`)
+      }
+    }
+
+    const existingRewardNames = new Set((existingRewards ?? []).map((reward) => reward.name.toLowerCase()))
+    if (!(existingRewards?.length ?? 0)) {
+      buildRewardSeeds().forEach((reward) => existingRewardNames.add(reward.name.toLowerCase()))
+    }
+    const customRewardsToInsert = (input.customRewardNames ?? [])
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .filter((name, index, array) => array.findIndex((candidate) => candidate.toLowerCase() === name.toLowerCase()) === index)
+      .filter((name) => !existingRewardNames.has(name.toLowerCase()))
+      .map((name) => ({
+        profile_id: profile.id,
+        name,
+        description: 'Recompensa personalizada capturada durante el onboarding conversacional.',
+        category: 'Custom',
+        cost_points: 20,
+        duration_minutes: null,
+        status: 'active',
+      }))
+
+    if (customRewardsToInsert.length) {
+      const { error } = await client.from('rewards').insert(customRewardsToInsert)
+      if (error) {
+        return fail('persistence_error', `No pude guardar las recompensas personalizadas: ${error.message}`)
       }
     }
 

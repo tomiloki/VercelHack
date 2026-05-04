@@ -129,6 +129,8 @@ export function createHabitQuestTools({ service = createHabitQuestDomainService(
         displayName: z.string().trim().min(1).nullable().optional(),
         timezone: z.string().trim().min(1).nullable().optional(),
         coachTone: z.enum(COACH_TONES).nullable().optional(),
+        customActivityNames: z.array(z.string().trim().min(1)).max(5).optional(),
+        customRewardNames: z.array(z.string().trim().min(1)).max(5).optional(),
       }),
       outputSchema: completeOnboardingOutputSchema,
       strict: true,
