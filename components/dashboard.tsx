@@ -20,8 +20,8 @@ import {
   CheckCircle2,
   Gift,
   ListChecks,
+  Lock,
   MessageCircle,
-  RotateCcw,
   Settings,
   Sparkles,
   Target,
@@ -81,7 +81,16 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
   const positiveActivities = allActivities.filter((a) => a.type === 'positive')
   const treatActivities = allActivities.filter((a) => a.type === 'treat')
 
-  const nextReward = treatActivities.find((reward) => reward.points <= availablePoints) ?? treatActivities[0]
+  const sortedRewards = [...treatActivities].sort((a, b) => {
+    const aAffordable = availablePoints >= a.points
+    const bAffordable = availablePoints >= b.points
+    if (aAffordable && !bAffordable) return -1
+    if (!aAffordable && bAffordable) return 1
+    return a.points - b.points
+  })
+
+  const nextReward = treatActivities.find((r) => r.points <= availablePoints) ?? treatActivities[0]
+  const affordableRewards = sortedRewards.filter((r) => availablePoints >= r.points)
 
   const groupByCategory = (activities: Activity[]) =>
     activities.reduce(
@@ -150,6 +159,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
+        {/* Hero + plan progress */}
         <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
           <Card className="relative overflow-hidden border-primary/15 bg-gradient-to-br from-primary/12 via-card to-treat/10 p-6">
             <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
@@ -204,6 +214,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
           </Card>
         </section>
 
+        {/* Wallet + today's plan */}
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <BalanceMeter
             availablePoints={availablePoints}
@@ -269,6 +280,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
           </Card>
         </section>
 
+        {/* Latest check-in */}
         {initialSummary?.recentCheckIn && (
           <section>
             <Card className="border-primary/15 bg-primary/5 p-4">
@@ -285,10 +297,54 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
           </section>
         )}
 
+        {/* Rewards snapshot — availability based on wallet */}
+        {sortedRewards.length > 0 && (
+          <section>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="font-serif text-2xl font-semibold text-foreground">Your rewards</h2>
+                <p className="text-sm text-muted-foreground">
+                  {affordableRewards.length > 0
+                    ? `${affordableRewards.length} reward${affordableRewards.length > 1 ? 's' : ''} ready to redeem · ${availablePoints} pts available`
+                    : `${availablePoints} pts available · keep earning to unlock rewards`}
+                </p>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-treat/10 text-treat">
+                <Gift className="h-5 w-5" />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {sortedRewards.map((reward) => {
+                const canAfford = availablePoints >= reward.points
+                const deficit = reward.points - availablePoints
+                return (
+                  <motion.div
+                    key={reward.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col gap-1"
+                  >
+                    <ActivityCard activity={reward} availablePoints={availablePoints} />
+                    {!canAfford && (
+                      <div className="flex items-center gap-1.5 rounded-xl border border-dashed border-treat/30 px-3 py-2 text-xs font-medium text-treat/70">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        {deficit} pts to go — ask coach how to earn them
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Coach chat */}
         <section>
           <ChatPanel displayName={displayName} />
         </section>
 
+        {/* Full marketplace */}
         <section>
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'positive' | 'treats')}>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
