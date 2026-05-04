@@ -141,7 +141,7 @@ export const useAppStore = create<AppState>()(
       },
     }),
     {
-      name: 'balance-flow-storage',
+      name: 'habitquest-storage',
     }
   )
 )
