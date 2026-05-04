@@ -1,18 +1,19 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState, useTransition } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { BalanceMeter } from './balance-meter'
 import { ActivityCard } from './activity-card'
 import { AddActivityDialog } from './add-activity-dialog'
 import { ChatPanel } from './chat-panel'
-import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Activity } from '@/lib/types'
+import type { Activity } from '@/lib/types'
+import type { TodaySummaryData } from '@/lib/ai/habitquest-domain-service'
+import type { UserActivityItem } from '@/app/api/activities/route'
 import {
   Bot,
   CalendarCheck,
@@ -34,29 +35,30 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-type PlannedActivity = {
-  activityId: string
-  label: string
-  note: string
-  activity: Activity
+function toActivityShape(item: UserActivityItem): Activity {
+  return {
+    id: item.id,
+    name: item.name,
+    icon: item.category.toLowerCase(),
+    type: item.type,
+    points: item.points,
+    duration: item.durationMinutes ?? undefined,
+    category: item.category,
+    description: item.description ?? undefined,
+  }
 }
-
-const demoPlan = [
-  { activityId: '6', label: 'Morning light walk', note: 'Start with movement and fresh air.' },
-  { activityId: '3', label: '10 minute meditation', note: 'Lower noise before deep work.' },
-  { activityId: '7', label: 'Reading block', note: 'One calm input before screens.' },
-  { activityId: '10', label: 'Stretch reset', note: 'Small recovery action to close the day.' },
-]
 
 type DashboardProps = {
   profileId: string
   displayName: string
+  initialSummary: TodaySummaryData | null
+  initialActivities: UserActivityItem[]
 }
 
-export function Dashboard({ profileId, displayName }: DashboardProps) {
+export function Dashboard({ profileId, displayName, initialSummary, initialActivities }: DashboardProps) {
   const router = useRouter()
-  const { getTodayProgress, getAllActivities, customActivities, resetDay, completeActivity } = useAppStore()
   const [activeTab, setActiveTab] = useState<'positive' | 'treats'>('positive')
+  const [isPending, startTransition] = useTransition()
 
   const scrollToCoachChat = () => {
     document.getElementById('coach-chat')?.scrollIntoView({
@@ -65,29 +67,24 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
     })
   }
 
-  const progress = getTodayProgress()
-  const allActivities = getAllActivities()
-  const positiveActivities = allActivities.filter((activity) => activity.type === 'positive')
-  const treatActivities = allActivities.filter((activity) => activity.type === 'treat')
-  const availablePoints = Math.max(0, progress.positivePoints - progress.treatPointsUsed)
-  const completedIds = new Set(progress.completedActivities.map((completed) => completed.activityId))
+  const planItems = (initialSummary?.items ?? []).filter((item) => item.status !== 'replaced')
+  const completedItemsCount = initialSummary?.completedItemsCount ?? 0
+  const pendingItemsCount = initialSummary?.pendingItemsCount ?? 0
+  const totalPlanItems = completedItemsCount + pendingItemsCount
+  const completionRate = totalPlanItems > 0 ? Math.round((completedItemsCount / totalPlanItems) * 100) : 0
 
-  const plannedActivities = demoPlan
-    .map((item) => ({ ...item, activity: allActivities.find((activity) => activity.id === item.activityId) }))
-    .filter((item): item is PlannedActivity => Boolean(item.activity))
+  const availablePoints = initialSummary?.availablePoints ?? 0
+  const completedPoints = initialSummary?.completedPoints ?? 0
+  const redeemedPoints = initialSummary?.redeemedPoints ?? 0
 
-  const completionRate = plannedActivities.length
-    ? Math.round((plannedActivities.filter((item) => completedIds.has(item.activity.id)).length / plannedActivities.length) * 100)
-    : 0
+  const allActivities = initialActivities.map(toActivityShape)
+  const positiveActivities = allActivities.filter((a) => a.type === 'positive')
+  const treatActivities = allActivities.filter((a) => a.type === 'treat')
 
   const nextReward = treatActivities.find((reward) => reward.points <= availablePoints) ?? treatActivities[0]
 
-  const getCompletedCount = (activityId: string) => {
-    return progress.completedActivities.filter((completed) => completed.activityId === activityId).length
-  }
-
-  const groupByCategory = (activities: Activity[]) => {
-    return activities.reduce(
+  const groupByCategory = (activities: Activity[]) =>
+    activities.reduce(
       (acc, activity) => {
         if (!acc[activity.category]) acc[activity.category] = []
         acc[activity.category].push(activity)
@@ -95,10 +92,20 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
       },
       {} as Record<string, Activity[]>,
     )
-  }
 
   const positiveByCategory = groupByCategory(positiveActivities)
   const treatsByCategory = groupByCategory(treatActivities)
+
+  const handleCompletePlanItem = (planItemId: string) => {
+    startTransition(async () => {
+      await fetch('/api/today/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planItemId }),
+      })
+      router.refresh()
+    })
+  }
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -134,12 +141,8 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={resetDay}>
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Reset demo day
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>Sign out demo user</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -194,7 +197,7 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
                 />
               </div>
               <p className="text-sm text-muted-foreground">
-                {progress.completedActivities.length} completions logged today. Next reward:{' '}
+                {completedItemsCount} completions logged today. Next reward:{' '}
                 <span className="font-medium text-foreground">{nextReward?.name ?? 'choose one'}</span>
               </p>
             </div>
@@ -202,48 +205,85 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <BalanceMeter />
+          <BalanceMeter
+            availablePoints={availablePoints}
+            completedPoints={completedPoints}
+            redeemedPoints={redeemedPoints}
+          />
 
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-primary">Today</p>
                 <h2 className="font-serif text-2xl font-semibold text-foreground">Coach plan</h2>
-                <p className="text-sm text-muted-foreground">Duration-based actions. No fixed schedule.</p>
+                <p className="text-sm text-muted-foreground">
+                  {initialSummary?.agentSummary ?? 'Duration-based actions. No fixed schedule.'}
+                </p>
               </div>
               <Target className="h-6 w-6 text-primary" />
             </div>
 
-            <div className="space-y-3">
-              {plannedActivities.map((item, index) => {
-                const done = completedIds.has(item.activity.id)
-                return (
-                  <button
-                    key={item.activity.id}
-                    onClick={() => !done && completeActivity(item.activity.id, item.activity.duration)}
-                    className="flex w-full items-start gap-3 rounded-2xl border border-border bg-background/60 p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
-                  >
-                    <div className={done ? 'mt-0.5 text-positive' : 'mt-0.5 text-muted-foreground'}>
-                      {done ? <CheckCircle2 className="h-5 w-5" /> : <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs">{index + 1}</span>}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-foreground">{item.label}</p>
-                        <span className="rounded-full bg-positive/10 px-2 py-0.5 text-xs font-medium text-positive">
-                          +{item.activity.points} pts
-                        </span>
-                        {item.activity.duration && (
-                          <span className="text-xs text-muted-foreground">{item.activity.duration} min</span>
+            {planItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                <p className="text-sm text-muted-foreground">No plan yet for today.</p>
+                <Button size="sm" variant="outline" onClick={scrollToCoachChat}>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Ask coach to plan your day
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {planItems.map((item, index) => {
+                  const done = item.status === 'completed'
+                  return (
+                    <button
+                      key={item.id}
+                      disabled={done || isPending}
+                      onClick={() => !done && handleCompletePlanItem(item.id)}
+                      className="flex w-full items-start gap-3 rounded-2xl border border-border bg-background/60 p-3 text-left transition hover:border-primary/40 hover:bg-primary/5 disabled:cursor-default disabled:opacity-70"
+                    >
+                      <div className={done ? 'mt-0.5 text-positive' : 'mt-0.5 text-muted-foreground'}>
+                        {done ? (
+                          <CheckCircle2 className="h-5 w-5" />
+                        ) : (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs">{index + 1}</span>
                         )}
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">{item.note}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-foreground">{item.title}</p>
+                          <span className="rounded-full bg-positive/10 px-2 py-0.5 text-xs font-medium text-positive">
+                            +{item.points} pts
+                          </span>
+                          {item.durationMinutes && (
+                            <span className="text-xs text-muted-foreground">{item.durationMinutes} min</span>
+                          )}
+                        </div>
+                        {item.rationale && <p className="mt-1 text-sm text-muted-foreground">{item.rationale}</p>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </Card>
         </section>
+
+        {initialSummary?.recentCheckIn && (
+          <section>
+            <Card className="border-primary/15 bg-primary/5 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <MessageCircle className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-primary">Latest check-in · {initialSummary.recentCheckIn.intent}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{initialSummary.recentCheckIn.message}</p>
+                </div>
+              </div>
+            </Card>
+          </section>
+        )}
 
         <section>
           <ChatPanel displayName={displayName} />
@@ -279,7 +319,7 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
                   <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{category}</h3>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {activities.map((activity) => (
-                      <ActivityCard key={activity.id} activity={activity} completedCount={getCompletedCount(activity.id)} />
+                      <ActivityCard key={activity.id} activity={activity} availablePoints={availablePoints} />
                     ))}
                   </div>
                 </motion.div>
@@ -306,7 +346,7 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
                   <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{category}</h3>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {activities.map((activity) => (
-                      <ActivityCard key={activity.id} activity={activity} completedCount={getCompletedCount(activity.id)} />
+                      <ActivityCard key={activity.id} activity={activity} availablePoints={availablePoints} />
                     ))}
                   </div>
                 </motion.div>
@@ -314,19 +354,6 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
             </TabsContent>
           </Tabs>
         </section>
-
-        {customActivities.length > 0 && (
-          <Card className="p-5">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Custom items</h3>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {customActivities
-                .filter((activity) => activity.type === activeTab)
-                .map((activity) => (
-                  <ActivityCard key={activity.id} activity={activity} completedCount={getCompletedCount(activity.id)} />
-                ))}
-            </div>
-          </Card>
-        )}
       </main>
     </div>
   )
