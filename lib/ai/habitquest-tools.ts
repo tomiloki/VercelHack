@@ -52,6 +52,10 @@ const logCheckInOutputSchema = summaryBaseSchema.extend({
   intent: z.string().nullable(),
   source: z.string().nullable(),
   createdAt: z.string().nullable(),
+  adaptationApplied: z.boolean(),
+  adaptationSummary: z.string().nullable(),
+  planStatus: z.string().nullable(),
+  adaptedPlanItems: z.array(planItemSchema),
 })
 
 const completePlanItemOutputSchema = summaryBaseSchema.extend({
@@ -191,7 +195,8 @@ export function createHabitQuestTools({ service = createHabitQuestDomainService(
       },
     }),
     logCheckIn: tool({
-      description: 'Persist a user check-in linked to the authenticated HabitQuest profile and current active plan when available.',
+      description:
+        'Persist a user check-in linked to the authenticated HabitQuest profile and adapt the active plan when the user is tired, stressed, or short on time.',
       inputSchema: z.object({
         message: z.string().trim().min(1),
         energyLevel: z.number().int().min(1).max(5).nullable().optional(),
@@ -212,6 +217,10 @@ export function createHabitQuestTools({ service = createHabitQuestDomainService(
               intent: result.data.intent,
               source: result.data.source,
               createdAt: result.data.createdAt,
+              adaptationApplied: result.data.adaptationApplied,
+              adaptationSummary: result.data.adaptationSummary,
+              planStatus: result.data.planStatus,
+              adaptedPlanItems: result.data.adaptedPlanItems,
             }
           : withError(result.error, {
               checkInId: null,
@@ -219,6 +228,10 @@ export function createHabitQuestTools({ service = createHabitQuestDomainService(
               intent: null,
               source: null,
               createdAt: null,
+              adaptationApplied: false,
+              adaptationSummary: null,
+              planStatus: null,
+              adaptedPlanItems: [],
             })
       },
     }),

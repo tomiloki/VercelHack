@@ -4,8 +4,10 @@ import { readFileSync } from 'node:fs'
 import { createChatPostHandler, POST } from '../app/api/chat/route'
 import {
   extractLatestUserText,
+  formatCheckInMarkdown,
   formatDailyPlanMarkdown,
   formatGenericCoachMarkdown,
+  isCheckInRequest,
   isPlanRequest,
 } from '../lib/ai/chat-fallback'
 
@@ -21,8 +23,9 @@ test('chat panel uses AI Elements markdown rendering and sends messages to /api/
   assert.match(source, /PromptInputTextarea/)
 })
 
-test('fallback helpers detect planning prompts and format markdown replies', () => {
+test('fallback helpers detect planning and check-in prompts and format markdown replies', () => {
   assert.equal(isPlanRequest('Armame un plan simple para hoy'), true)
+  assert.equal(isCheckInRequest('Estoy cansado y con poco tiempo hoy'), true)
   assert.equal(
     extractLatestUserText([
       {
@@ -57,10 +60,34 @@ test('fallback helpers detect planning prompts and format markdown replies', () 
     ],
   })
 
+  const checkInMarkdown = formatCheckInMarkdown({
+    checkInId: 'check-1',
+    dailyPlanId: 'plan-1',
+    intent: 'fatigue',
+    source: 'web',
+    createdAt: '2026-05-04T10:00:00.000Z',
+    adaptationApplied: true,
+    adaptationSummary: 'Ajusté el plan a una versión más liviana para cuidar tu energía sin cortar la racha.',
+    planStatus: 'active',
+    adaptedPlanItems: [
+      {
+        id: 'item-2',
+        title: 'Tomar agua',
+        durationMinutes: 1,
+        points: 5,
+        position: 1,
+        status: 'pending',
+        rationale: 'Adaptada por energía baja: Estoy cansado.',
+      },
+    ],
+  })
+
   assert.match(planMarkdown, /## Plan de hoy/)
   assert.match(planMarkdown, /1\.\s+\*\*Caminar 15 minutos\*\*/)
   assert.match(planMarkdown, /20 pts/)
   assert.match(planMarkdown, /15 min/)
+  assert.match(checkInMarkdown, /## Ajuste del plan/)
+  assert.match(checkInMarkdown, /Tomar agua/)
   assert.match(formatGenericCoachMarkdown('Tengo poca energía'), /## Próximo paso/)
 })
 
@@ -157,4 +184,89 @@ test('chat route streams an ordered daily plan end to end when planning data is 
   assert.match(assistantText, /2\.\s+\*\*Tomar agua\*\* · 5 pts · 1 min/)
   assert.match(assistantText, /Sube energía sin fricción\./)
   assert.doesNotMatch(assistantText, /\b\d{1,2}:\d{2}\b/)
+})
+
+test('chat route streams an adapted plan end to end when the user checks in with low energy', async () => {
+  const handler = createChatPostHandler({
+    gatewayApiKey: undefined,
+    createDomainService: () => ({
+      completeOnboarding: async () => {
+        throw new Error('not used')
+      },
+      generateDailyPlan: async () => {
+        throw new Error('not used')
+      },
+      logCheckIn: async () => ({
+        ok: true,
+        data: {
+          checkInId: 'check-1',
+          dailyPlanId: 'plan-1',
+          intent: 'fatigue',
+          source: 'web',
+          createdAt: '2026-05-04T12:00:00.000Z',
+          adaptationApplied: true,
+          adaptationSummary: 'Ajusté el plan a una versión más liviana para cuidar tu energía sin cortar la racha.',
+          planStatus: 'active',
+          adaptedPlanItems: [
+            {
+              id: 'item-1',
+              title: 'Tomar agua',
+              durationMinutes: 1,
+              points: 5,
+              position: 1,
+              status: 'pending',
+              rationale: 'Adaptada por energía baja: Estoy cansado y con poco tiempo hoy.',
+            },
+            {
+              id: 'item-2',
+              title: 'Respirar 5 minutos',
+              durationMinutes: 5,
+              points: 10,
+              position: 2,
+              status: 'pending',
+              rationale: 'Adaptada por energía baja: Estoy cansado y con poco tiempo hoy.',
+            },
+          ],
+        },
+      }),
+      completePlanItem: async () => {
+        throw new Error('not used')
+      },
+      redeemReward: async () => {
+        throw new Error('not used')
+      },
+      getTodaySummary: async () => {
+        throw new Error('not used')
+      },
+      updatePreferences: async () => {
+        throw new Error('not used')
+      },
+    }),
+  })
+
+  const response = await handler(
+    new Request('http://localhost/api/chat', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            id: 'msg-2',
+            role: 'user',
+            parts: [{ type: 'text', text: 'Estoy cansado y con poco tiempo hoy.' }],
+          },
+        ],
+      }),
+    }),
+  )
+
+  const body = await response.text()
+  const assistantText = extractAssistantTextFromEventStream(body)
+
+  assert.match(assistantText, /## Ajuste del plan/)
+  assert.match(assistantText, /1\.\s+\*\*Tomar agua\*\* · 5 pts · 1 min/)
+  assert.match(assistantText, /2\.\s+\*\*Respirar 5 minutos\*\* · 10 pts · 5 min/)
+  assert.match(assistantText, /Ajusté el plan a una versión más liviana/)
 })

@@ -3,9 +3,11 @@ import { createHabitQuestAgent } from '@/lib/ai/habitquest-agent'
 import { createHabitQuestDomainService, type HabitQuestDomainService } from '@/lib/ai/habitquest-domain-service'
 import {
   extractLatestUserText,
+  formatCheckInMarkdown,
   formatDailyPlanMarkdown,
   formatGenericCoachMarkdown,
   formatTodaySummaryMarkdown,
+  isCheckInRequest,
   isPlanRequest,
   isSummaryRequest,
 } from '@/lib/ai/chat-fallback'
@@ -32,8 +34,21 @@ type ChatRouteDependencies = {
   createAgent?: (input: { model: string; domainService: ChatDomainService }) => ReturnType<typeof createHabitQuestAgent>
 }
 
-async function buildFallbackReply(messages: UIMessage[], service: Pick<ChatDomainService, 'generateDailyPlan' | 'getTodaySummary'>) {
+async function buildFallbackReply(
+  messages: UIMessage[],
+  service: Pick<ChatDomainService, 'generateDailyPlan' | 'getTodaySummary' | 'logCheckIn'>,
+) {
   const latestUserText = extractLatestUserText(messages)
+
+  if (isCheckInRequest(latestUserText)) {
+    const result = await service.logCheckIn({
+      message: latestUserText,
+    })
+
+    if (result.ok) {
+      return formatCheckInMarkdown(result.data)
+    }
+  }
 
   if (isPlanRequest(latestUserText)) {
     const result = await service.generateDailyPlan({
@@ -59,7 +74,7 @@ async function buildFallbackReply(messages: UIMessage[], service: Pick<ChatDomai
 
 async function createFallbackCoachResponse(
   messages: UIMessage[],
-  service: Pick<ChatDomainService, 'generateDailyPlan' | 'getTodaySummary'>,
+  service: Pick<ChatDomainService, 'generateDailyPlan' | 'getTodaySummary' | 'logCheckIn'>,
 ) {
   const stream = createUIMessageStream({
     originalMessages: messages,

@@ -1,5 +1,5 @@
 import type { UIMessage } from 'ai'
-import type { GenerateDailyPlanData, TodaySummaryData } from '@/lib/ai/habitquest-domain-service'
+import type { GenerateDailyPlanData, LogCheckInData, TodaySummaryData } from '@/lib/ai/habitquest-domain-service'
 
 export function extractLatestUserText(messages: UIMessage[]) {
   const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user')
@@ -19,6 +19,12 @@ export function isPlanRequest(text: string) {
   return /\b(plan|planific|acciones|organiza|organizar|hoy)\b/i.test(text)
 }
 
+export function isCheckInRequest(text: string) {
+  return /\b(cansad|agotad|sin energia|sin energía|poca energia|poca energía|estres|estrés|abrumad|ansios|sin tiempo|poco tiempo|apurad|no llego|check-?in)\b/i.test(
+    text,
+  )
+}
+
 export function isSummaryRequest(text: string) {
   return /\b(resumen|progreso|puntos|estado|balance)\b/i.test(text)
 }
@@ -36,6 +42,25 @@ export function formatDailyPlanMarkdown(plan: GenerateDailyPlanData) {
     : '- Todavía no hay acciones cargadas para ese plan.'
 
   return `## Plan de hoy\n\n${plan.agentSummary ?? 'Te propongo un plan corto y concreto para hoy.'}\n\n${items}`
+}
+
+export function formatCheckInMarkdown(checkIn: LogCheckInData) {
+  if (checkIn.adaptationApplied && checkIn.adaptedPlanItems.length) {
+    const items = checkIn.adaptedPlanItems
+      .map(
+        (item) =>
+          `${item.position}. **${item.title}** · ${item.points} pts${item.durationMinutes ? ` · ${item.durationMinutes} min` : ''}${
+            item.rationale ? `\n   - ${item.rationale}` : ''
+          }`,
+      )
+      .join('\n')
+
+    return `## Ajuste del plan\n\n${checkIn.adaptationSummary ?? 'Ya ajusté tu plan para que siga siendo realista hoy.'}\n\n${items}`
+  }
+
+  return `## Check-in guardado\n\nRegistré tu estado con intención **${checkIn.intent}**.${
+    checkIn.planStatus ? ` El plan quedó en estado **${checkIn.planStatus}**.` : ''
+  }`
 }
 
 export function formatTodaySummaryMarkdown(summary: TodaySummaryData) {

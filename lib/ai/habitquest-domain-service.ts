@@ -93,6 +93,10 @@ export type LogCheckInData = {
   intent: string
   source: string
   createdAt: string
+  adaptationApplied: boolean
+  adaptationSummary: string | null
+  planStatus: string | null
+  adaptedPlanItems: DailyPlanItemSummary[]
 }
 
 export type CompletePlanItemInput = {
@@ -279,6 +283,108 @@ export function calculateWalletBalance(
     if (transaction.type === 'redeem') return balance - transaction.points
     return balance + transaction.points
   }, 0)
+}
+
+export function detectCheckInIntent({
+  message,
+  energyLevel,
+  stressLevel,
+}: Pick<LogCheckInInput, 'message' | 'energyLevel' | 'stressLevel'>): CheckInIntent {
+  const normalizedMessage = message.trim().toLowerCase()
+
+  if (
+    /\b(cansad|agotad|fundid|sin energia|sin energía|poca energia|poca energía|fatig|dormi mal|dormi poco|dormí mal|dormí poco)\b/i.test(
+      normalizedMessage,
+    ) ||
+    (typeof energyLevel === 'number' && energyLevel <= 2)
+  ) {
+    return 'fatigue'
+  }
+
+  if (
+    /\b(sin tiempo|poco tiempo|apurad|apurada|no llego|voy tarde|estres|estrés|abrumad|ansios|nervios)\b/i.test(normalizedMessage) ||
+    (typeof stressLevel === 'number' && stressLevel >= 4)
+  ) {
+    return 'replan'
+  }
+
+  if (/\b(recompensa|canjear|premio)\b/i.test(normalizedMessage)) {
+    return 'reward_request'
+  }
+
+  if (/\b(hice|avance|avancé|complet|termin|logr)\b/i.test(normalizedMessage)) {
+    return 'progress'
+  }
+
+  if (/\b(siento|pienso|reflex|me paso|me pasó)\b/i.test(normalizedMessage)) {
+    return 'reflection'
+  }
+
+  return 'other'
+}
+
+function getCheckInCategoryPriority(intent: CheckInIntent, category: string) {
+  const normalizedCategory = category.trim().toLowerCase()
+  const priorities =
+    intent === 'fatigue'
+      ? ['health', 'mind', 'reset', 'nature', 'movement', 'nutrition', 'social', 'custom']
+      : ['health', 'mind', 'reset', 'movement', 'nature', 'nutrition', 'social', 'custom']
+
+  const index = priorities.indexOf(normalizedCategory)
+  return index === -1 ? priorities.length : index
+}
+
+export function selectActivitiesForCheckInAdjustment<
+  T extends { id: string; name: string; category: string; duration_minutes: number | null; points: number },
+>(activities: T[], intent: CheckInIntent, maxItems: number) {
+  const sorted = [...activities].sort((left, right) => {
+    const categoryDelta = getCheckInCategoryPriority(intent, left.category) - getCheckInCategoryPriority(intent, right.category)
+    if (categoryDelta !== 0) return categoryDelta
+
+    const durationDelta = (left.duration_minutes ?? Number.MAX_SAFE_INTEGER) - (right.duration_minutes ?? Number.MAX_SAFE_INTEGER)
+    if (durationDelta !== 0) return durationDelta
+
+    if (left.points !== right.points) return left.points - right.points
+    return left.name.localeCompare(right.name)
+  })
+
+  const selected: T[] = []
+  const usedCategories = new Set<string>()
+
+  for (const activity of sorted) {
+    if (selected.length >= maxItems) break
+
+    if (!usedCategories.has(activity.category)) {
+      selected.push(activity)
+      usedCategories.add(activity.category)
+    }
+  }
+
+  for (const activity of sorted) {
+    if (selected.length >= maxItems) break
+
+    if (!selected.some((item) => item.id === activity.id)) {
+      selected.push(activity)
+    }
+  }
+
+  return selected.slice(0, maxItems)
+}
+
+function buildAdaptationSummary(intent: CheckInIntent) {
+  if (intent === 'fatigue') {
+    return 'Ajusté el plan a una versión más liviana para cuidar tu energía sin cortar la racha.'
+  }
+
+  return 'Reorganicé el plan con opciones más cortas y realistas para que lo puedas sostener hoy.'
+}
+
+function buildAdaptationRationale(intent: CheckInIntent, message: string) {
+  if (intent === 'fatigue') {
+    return `Adaptada por energía baja: ${message}`
+  }
+
+  return `Adaptada por cambio de contexto: ${message}`
 }
 
 export class HabitQuestDomainService {
@@ -727,10 +833,11 @@ export class HabitQuestDomainService {
     const profile = authResult.data.profile
     const client = await this.createClient()
     const today = toDayKey()
+    const resolvedIntent = input.intent ?? detectCheckInIntent(input)
 
     const { data: planRows, error: planError } = await client
       .from('daily_plans')
-      .select('id')
+      .select('id, status')
       .eq('profile_id', profile.id)
       .eq('plan_date', today)
       .eq('status', 'active')
@@ -750,7 +857,7 @@ export class HabitQuestDomainService {
         message: input.message,
         energy_level: input.energyLevel ?? null,
         stress_level: input.stressLevel ?? null,
-        intent: input.intent ?? 'other',
+        intent: resolvedIntent,
         source: input.source ?? 'web',
       })
       .select('id, daily_plan_id, intent, source, created_at')
@@ -760,12 +867,142 @@ export class HabitQuestDomainService {
       return fail('persistence_error', `No pude guardar el check-in: ${error?.message ?? 'sin respuesta'}`)
     }
 
+    let adaptationApplied = false
+    let adaptationSummary: string | null = null
+    let planStatus: string | null = planRows?.[0]?.status ?? null
+    let adaptedPlanItems: DailyPlanItemSummary[] = []
+
+    if (activePlanId && (resolvedIntent === 'fatigue' || resolvedIntent === 'replan')) {
+      const { data: currentItems, error: currentItemsError } = await client
+        .from('daily_plan_items')
+        .select('id, user_activity_id, title, duration_minutes, points, position, status, rationale')
+        .eq('profile_id', profile.id)
+        .eq('daily_plan_id', activePlanId)
+        .order('position', { ascending: true })
+
+      if (currentItemsError) {
+        return fail('persistence_error', `No pude leer el plan a adaptar: ${currentItemsError.message}`)
+      }
+
+      const pendingItems = (currentItems ?? []).filter((item) => item.status === 'pending')
+      const completedItems = (currentItems ?? []).filter((item) => item.status === 'completed')
+
+      if (pendingItems.length) {
+        const { data: activities, error: activitiesError } = await client
+          .from('user_activities')
+          .select('id, name, category, duration_minutes, points, status')
+          .eq('profile_id', profile.id)
+          .eq('status', 'active')
+
+        if (activitiesError) {
+          return fail('persistence_error', `No pude leer actividades para adaptar el plan: ${activitiesError.message}`)
+        }
+
+        const completedActivityIds = new Set(
+          completedItems
+            .map((item) => item.user_activity_id)
+            .filter((activityId): activityId is string => typeof activityId === 'string'),
+        )
+        const pendingActivityIds = new Set(
+          pendingItems
+            .map((item) => item.user_activity_id)
+            .filter((activityId): activityId is string => typeof activityId === 'string'),
+        )
+
+        const freshActivities = (activities ?? []).filter(
+          (activity) => !completedActivityIds.has(activity.id) && !pendingActivityIds.has(activity.id),
+        )
+        const candidateActivities = freshActivities.length
+          ? freshActivities
+          : (activities ?? []).filter((activity) => !completedActivityIds.has(activity.id))
+        const maxAdaptedItems =
+          resolvedIntent === 'fatigue' || (typeof input.energyLevel === 'number' && input.energyLevel <= 2) ? 2 : 3
+        const selectedActivities = selectActivitiesForCheckInAdjustment(candidateActivities, resolvedIntent, maxAdaptedItems)
+
+        if (selectedActivities.length) {
+          const currentMaxPosition = (currentItems ?? []).reduce((max, item) => Math.max(max, item.position), 0)
+          const completedMaxPosition = completedItems.reduce((max, item) => Math.max(max, item.position), 0)
+          const nextVisiblePosition = completedMaxPosition + 1
+          const replacedBasePosition = currentMaxPosition + selectedActivities.length + 10
+
+          for (const [index, item] of pendingItems.entries()) {
+            const { error: replaceError } = await client
+              .from('daily_plan_items')
+              .update({
+                status: 'replaced',
+                position: replacedBasePosition + index,
+              })
+              .eq('profile_id', profile.id)
+              .eq('id', item.id)
+
+            if (replaceError) {
+              return fail('persistence_error', `No pude conservar el historial del plan anterior: ${replaceError.message}`)
+            }
+          }
+
+          const itemsToInsert = selectedActivities.map((activity, index) => ({
+            profile_id: profile.id,
+            daily_plan_id: activePlanId,
+            user_activity_id: activity.id,
+            title: activity.name,
+            duration_minutes: activity.duration_minutes,
+            points: activity.points,
+            position: nextVisiblePosition + index,
+            status: 'pending',
+            rationale: buildAdaptationRationale(resolvedIntent, input.message),
+          }))
+
+          const { data: insertedItems, error: insertItemsError } = await client
+            .from('daily_plan_items')
+            .insert(itemsToInsert)
+            .select('id, title, duration_minutes, points, position, status, rationale')
+            .order('position', { ascending: true })
+
+          if (insertItemsError) {
+            return fail('persistence_error', `No pude guardar el plan adaptado: ${insertItemsError.message}`)
+          }
+
+          adaptationApplied = true
+          adaptationSummary = buildAdaptationSummary(resolvedIntent)
+          adaptedPlanItems = (insertedItems ?? []).map((item) => ({
+            id: item.id,
+            title: item.title,
+            durationMinutes: item.duration_minutes,
+            points: item.points,
+            position: item.position,
+            status: item.status,
+            rationale: item.rationale,
+          }))
+
+          const { error: updatePlanError } = await client
+            .from('daily_plans')
+            .update({
+              status: 'active',
+              created_from: 'check_in_adjustment',
+              agent_summary: adaptationSummary,
+            })
+            .eq('profile_id', profile.id)
+            .eq('id', activePlanId)
+
+          if (updatePlanError) {
+            return fail('persistence_error', `No pude actualizar el resumen del plan adaptado: ${updatePlanError.message}`)
+          }
+
+          planStatus = 'active'
+        }
+      }
+    }
+
     return ok({
       checkInId: data.id,
       dailyPlanId: data.daily_plan_id,
       intent: data.intent,
       source: data.source,
       createdAt: data.created_at,
+      adaptationApplied,
+      adaptationSummary,
+      planStatus,
+      adaptedPlanItems,
     })
   }
 
