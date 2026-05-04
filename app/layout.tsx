@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { DM_Sans, Fraunces } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import './globals.css'
 
 const dmSans = DM_Sans({
@@ -51,7 +52,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="bg-background">
       <body className={`${dmSans.variable} ${fraunces.variable} font-sans antialiased min-h-screen`}>
-        {children}
+        <TooltipProvider>{children}</TooltipProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

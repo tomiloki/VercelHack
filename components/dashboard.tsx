@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { BalanceMeter } from './balance-meter'
 import { ActivityCard } from './activity-card'
 import { AddActivityDialog } from './add-activity-dialog'
+import { ChatPanel } from './chat-panel'
 import { useAppStore } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -57,6 +58,13 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
   const { getTodayProgress, getAllActivities, customActivities, resetDay, setOnboarded, completeActivity } = useAppStore()
   const [activeTab, setActiveTab] = useState<'positive' | 'treats'>('positive')
 
+  const scrollToCoachChat = () => {
+    document.getElementById('coach-chat')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }
+
   const progress = getTodayProgress()
   const allActivities = getAllActivities()
   const positiveActivities = allActivities.filter((activity) => activity.type === 'positive')
@@ -72,10 +80,7 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
     ? Math.round((plannedActivities.filter((item) => completedIds.has(item.activity.id)).length / plannedActivities.length) * 100)
     : 0
 
-  const nextReward = useMemo(
-    () => treatActivities.find((reward) => reward.points <= availablePoints) ?? treatActivities[0],
-    [availablePoints, treatActivities],
-  )
+  const nextReward = treatActivities.find((reward) => reward.points <= availablePoints) ?? treatActivities[0]
 
   const getCompletedCount = (activityId: string) => {
     return progress.completedActivities.filter((completed) => completed.activityId === activityId).length
@@ -119,7 +124,7 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button className="hidden gap-2 sm:inline-flex" size="sm">
+            <Button className="hidden gap-2 sm:inline-flex" size="sm" onClick={scrollToCoachChat}>
               <MessageCircle className="h-4 w-4" />
               Talk to coach
             </Button>
@@ -160,13 +165,13 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
                 earn points, and unlock personal rewards with intention.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button className="gap-2">
+                <Button className="gap-2" onClick={scrollToCoachChat}>
                   <MessageCircle className="h-4 w-4" />
                   Start check-in
                 </Button>
                 <Button variant="outline" className="gap-2 bg-background/60">
                   <CalendarCheck className="h-4 w-4" />
-                  View today's plan
+                  View today&apos;s plan
                 </Button>
               </div>
             </div>
@@ -240,6 +245,10 @@ export function Dashboard({ profileId, displayName }: DashboardProps) {
               })}
             </div>
           </Card>
+        </section>
+
+        <section>
+          <ChatPanel displayName={displayName} />
         </section>
 
         <section>
