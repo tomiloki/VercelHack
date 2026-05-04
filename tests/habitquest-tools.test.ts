@@ -14,6 +14,9 @@ type MockState = {
   daily_plan_items: Array<Record<string, any>>
   user_activities: Array<Record<string, any>>
   check_ins: Array<Record<string, any>>
+  completions: Array<Record<string, any>>
+  rewards: Array<Record<string, any>>
+  wallet_transactions: Array<Record<string, any>>
 }
 
 class MockSupabaseQuery {
@@ -65,6 +68,10 @@ class MockSupabaseQuery {
   }
 
   single() {
+    return this.executeSingle()
+  }
+
+  maybeSingle() {
     return this.executeSingle()
   }
 
@@ -547,6 +554,9 @@ test('logCheckIn stores the detected intent and adapts pending items without del
       },
     ],
     check_ins: [],
+    completions: [],
+    rewards: [],
+    wallet_transactions: [],
   }
 
   const service = createHabitQuestDomainService({
@@ -588,6 +598,136 @@ test('logCheckIn stores the detected intent and adapts pending items without del
   assert.equal(replacedItems.length, 2)
   assert.equal(pendingItems.length, 2)
   assert.equal(state.daily_plan_items.length, 5)
+})
+
+test('completePlanItem creates an earn wallet transaction and returns updated available points', async () => {
+  const state: MockState = {
+    daily_plans: [
+      {
+        id: 'plan-1',
+        profile_id: 'profile-1',
+        plan_date: '2026-05-04',
+        status: 'active',
+        agent_summary: 'Plan original',
+        created_from: 'manual',
+      },
+    ],
+    daily_plan_items: [
+      {
+        id: 'item-1',
+        profile_id: 'profile-1',
+        daily_plan_id: 'plan-1',
+        user_activity_id: 'activity-1',
+        title: 'Caminar',
+        duration_minutes: 15,
+        points: 20,
+        position: 1,
+        status: 'pending',
+        rationale: 'Plan original.',
+      },
+    ],
+    user_activities: [],
+    check_ins: [],
+    completions: [],
+    rewards: [],
+    wallet_transactions: [
+      {
+        id: 'wallet-0',
+        profile_id: 'profile-1',
+        type: 'earn',
+        points: 10,
+        reason: 'Existing points',
+      },
+    ],
+  }
+
+  const service = createHabitQuestDomainService({
+    createClient: async () => createMockSupabaseClient(state) as never,
+    getProfileContext: async () => ({
+      isConfigured: true,
+      profile: {
+        id: 'profile-1',
+        user_id: 'user-1',
+        display_name: 'Tomi',
+        timezone: 'America/Santiago',
+        coach_tone: 'collaborative',
+        created_at: '2026-05-04T08:00:00.000Z',
+        updated_at: '2026-05-04T08:00:00.000Z',
+      },
+    }),
+  })
+
+  const result = await service.completePlanItem({
+    planItemId: 'item-1',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+
+  assert.equal(result.data.pointsAwarded, 20)
+  assert.equal(result.data.availablePoints, 30)
+  assert.equal(state.completions.length, 1)
+  assert.equal(state.wallet_transactions.length, 2)
+  assert.equal(state.wallet_transactions[1]?.type, 'earn')
+  assert.equal(state.wallet_transactions[1]?.points, 20)
+  assert.equal(state.daily_plan_items[0]?.status, 'completed')
+})
+
+test('redeemReward creates a redeem wallet transaction and returns remaining points', async () => {
+  const state: MockState = {
+    daily_plans: [],
+    daily_plan_items: [],
+    user_activities: [],
+    check_ins: [],
+    completions: [],
+    rewards: [
+      {
+        id: 'reward-1',
+        profile_id: 'profile-1',
+        name: 'Gaming session',
+        cost_points: 25,
+        status: 'active',
+      },
+    ],
+    wallet_transactions: [
+      {
+        id: 'wallet-1',
+        profile_id: 'profile-1',
+        type: 'earn',
+        points: 40,
+        reason: 'Existing points',
+      },
+    ],
+  }
+
+  const service = createHabitQuestDomainService({
+    createClient: async () => createMockSupabaseClient(state) as never,
+    getProfileContext: async () => ({
+      isConfigured: true,
+      profile: {
+        id: 'profile-1',
+        user_id: 'user-1',
+        display_name: 'Tomi',
+        timezone: 'America/Santiago',
+        coach_tone: 'collaborative',
+        created_at: '2026-05-04T08:00:00.000Z',
+        updated_at: '2026-05-04T08:00:00.000Z',
+      },
+    }),
+  })
+
+  const result = await service.redeemReward({
+    rewardId: 'reward-1',
+  })
+
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+
+  assert.equal(result.data.rewardName, 'Gaming session')
+  assert.equal(result.data.remainingPoints, 15)
+  assert.equal(state.wallet_transactions.length, 2)
+  assert.equal(state.wallet_transactions[1]?.type, 'redeem')
+  assert.equal(state.wallet_transactions[1]?.points, 25)
 })
 
 test('wallet balance subtracts redeems from earned points', () => {

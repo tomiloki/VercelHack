@@ -66,7 +66,7 @@ export function formatCheckInMarkdown(checkIn: LogCheckInData) {
 export function formatTodaySummaryMarkdown(summary: TodaySummaryData) {
   const planStatus = summary.planStatus ?? 'sin plan activo'
 
-  return `## Resumen de hoy\n\n- **Estado del plan:** ${planStatus}\n- **Puntos disponibles:** ${summary.availablePoints}\n- **Items completos:** ${summary.completedItemsCount}\n- **Items pendientes:** ${summary.pendingItemsCount}${
+  return `## Resumen de hoy\n\n- **Estado del plan:** ${planStatus}\n- **Puntos ganados:** ${summary.completedPoints}\n- **Puntos canjeados:** ${summary.redeemedPoints}\n- **Puntos disponibles:** ${summary.availablePoints}\n- **Items completos:** ${summary.completedItemsCount}\n- **Items pendientes:** ${summary.pendingItemsCount}${
     summary.recentCheckIn ? `\n- **Último check-in:** ${summary.recentCheckIn.message}` : ''
   }`
 }

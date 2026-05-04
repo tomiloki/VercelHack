@@ -7,6 +7,7 @@ import {
   formatCheckInMarkdown,
   formatDailyPlanMarkdown,
   formatGenericCoachMarkdown,
+  formatTodaySummaryMarkdown,
   isCheckInRequest,
   isPlanRequest,
 } from '../lib/ai/chat-fallback'
@@ -82,12 +83,30 @@ test('fallback helpers detect planning and check-in prompts and format markdown 
     ],
   })
 
+  const summaryMarkdown = formatTodaySummaryMarkdown({
+    profileId: 'profile-1',
+    planId: 'plan-1',
+    planDate: '2026-05-04',
+    planStatus: 'active',
+    agentSummary: 'Plan chico.',
+    availablePoints: 25,
+    completedPoints: 40,
+    redeemedPoints: 15,
+    completedItemsCount: 2,
+    pendingItemsCount: 1,
+    items: [],
+    recentCheckIn: null,
+  })
+
   assert.match(planMarkdown, /## Plan de hoy/)
   assert.match(planMarkdown, /1\.\s+\*\*Caminar 15 minutos\*\*/)
   assert.match(planMarkdown, /20 pts/)
   assert.match(planMarkdown, /15 min/)
   assert.match(checkInMarkdown, /## Ajuste del plan/)
   assert.match(checkInMarkdown, /Tomar agua/)
+  assert.match(summaryMarkdown, /Puntos ganados:\*\* 40/)
+  assert.match(summaryMarkdown, /Puntos canjeados:\*\* 15/)
+  assert.match(summaryMarkdown, /Puntos disponibles:\*\* 25/)
   assert.match(formatGenericCoachMarkdown('Tengo poca energía'), /## Próximo paso/)
 })
 
