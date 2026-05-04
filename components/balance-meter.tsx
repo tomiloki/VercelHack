@@ -1,18 +1,19 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useAppStore } from '@/lib/store'
 import { Card } from '@/components/ui/card'
 import { Flame, Gift, Sparkles, TrendingUp, Zap } from 'lucide-react'
 
-export function BalanceMeter() {
-  const { getTodayProgress, getStreak } = useAppStore()
-  const progress = getTodayProgress()
-  const streak = getStreak()
+type BalanceMeterProps = {
+  availablePoints: number
+  completedPoints: number
+  redeemedPoints: number
+  streak?: number
+}
 
-  const availablePoints = Math.max(0, progress.positivePoints - progress.treatPointsUsed)
-  const totalEarned = progress.positivePoints
-  const totalSpent = progress.treatPointsUsed
+export function BalanceMeter({ availablePoints, completedPoints, redeemedPoints, streak = 0 }: BalanceMeterProps) {
+  const totalEarned = completedPoints
+  const totalSpent = redeemedPoints
   const maxDisplay = Math.max(120, totalEarned + 40)
   const earnedPercent = Math.min(100, (totalEarned / maxDisplay) * 100)
   const spentPercent = Math.min(100, (totalSpent / maxDisplay) * 100)

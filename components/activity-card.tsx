@@ -24,8 +24,8 @@ import {
 
 interface ActivityCardProps {
   activity: Activity
-  isCompleted?: boolean
   completedCount?: number
+  availablePoints?: number
 }
 
 function ActivityIcon({ activity }: { activity: Activity }) {
@@ -45,14 +45,12 @@ function ActivityIcon({ activity }: { activity: Activity }) {
   return <Leaf className={className} />
 }
 
-export function ActivityCard({ activity, completedCount = 0 }: ActivityCardProps) {
+export function ActivityCard({ activity, completedCount = 0, availablePoints = 0 }: ActivityCardProps) {
   const [isAnimating, setIsAnimating] = useState(false)
-  const { completeActivity, canUseTreat, getTodayProgress } = useAppStore()
+  const { completeActivity } = useAppStore()
 
   const isPositive = activity.type === 'positive'
-  const canUse = isPositive || canUseTreat(activity.points)
-  const progress = getTodayProgress()
-  const availablePoints = progress.positivePoints - progress.treatPointsUsed
+  const canUse = isPositive || availablePoints >= activity.points
 
   const handleComplete = () => {
     if (!canUse) return
