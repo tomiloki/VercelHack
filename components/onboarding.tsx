@@ -254,14 +254,13 @@ export function Onboarding({ onCompleted }: OnboardingProps) {
             <div>
               <p className="inline-flex items-center gap-2 rounded-full bg-background/75 px-3 py-1 text-xs font-medium text-primary">
                 <Bot className="h-3.5 w-3.5" />
-                Conversational onboarding
+                Tu coach personal
               </p>
               <h1 className="mt-4 font-serif text-4xl font-semibold tracking-tight text-foreground">
-                El agente tiene que ser el producto.
+                Hablemos primero. Tu plan empieza con una conversación.
               </h1>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                Acá no te hacemos clickear un formulario muerto. Primero hablamos, capturamos contexto útil y
-                recién después persistimos objetivos, actividades y recompensas.
+                En dos minutos te conocemos y armamos tu primera rutina del día. Sin formularios, sin pasos complicados.
               </p>
 
               <div className="mt-6 space-y-3">
@@ -283,14 +282,14 @@ export function Onboarding({ onCompleted }: OnboardingProps) {
                   <Gift className="mt-0.5 h-5 w-5 text-primary" />
                   <div>
                     <p className="font-medium text-foreground">Recompensas conscientes</p>
-                    <p className="text-sm text-muted-foreground">Se guardan desde el onboarding para que el loop arranque completo.</p>
+                    <p className="text-sm text-muted-foreground">Para que el coach sepa qué ofrecerte desde el primer día.</p>
                   </div>
                 </div>
               </div>
             </div>
 
             <p className="mt-6 text-sm text-muted-foreground">
-              Alcance chico, pero con una base sana: conversación primero, persistencia real después.
+              Tomamos nota de todo lo que contás para que el plan sea tuyo, no genérico.
             </p>
           </div>
         </Card>
@@ -378,10 +377,10 @@ export function Onboarding({ onCompleted }: OnboardingProps) {
               </Card>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">
-                  Esto persiste objetivos, actividades iniciales y recompensas en Supabase.
+                  Guardamos tus objetivos, actividades y recompensas para arrancar.
                 </p>
                 <Button onClick={handleCompleteOnboarding} disabled={isSaving}>
-                  {isSaving ? 'Guardando...' : 'Completar onboarding'}
+                  {isSaving ? 'Guardando...' : 'Empezar'}
                   <MessageCircle className="ml-2 h-4 w-4" />
                 </Button>
               </div>

@@ -133,7 +133,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
             <div>
               <h1 className="font-serif text-xl font-semibold leading-none text-foreground">HabitQuest</h1>
               <p className="mt-1 text-xs text-muted-foreground">
-                {displayName} · profile {profileId.slice(0, 8)}
+                {displayName}
               </p>
             </div>
           </div>
@@ -166,7 +166,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
             <div className="relative max-w-3xl">
               <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-background/70 px-3 py-1 text-xs font-medium text-primary shadow-sm">
                 <Bot className="h-3.5 w-3.5" />
-                Agent-first MVP
+                Tu coach personal
               </p>
               <h2 className="font-serif text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
                 Manage today with a coach, not another rigid checklist.

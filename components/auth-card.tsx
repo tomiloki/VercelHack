@@ -45,23 +45,23 @@ export function AuthCard({ isConfigured }: AuthCardProps) {
 
         <h1 className="font-serif text-4xl font-semibold text-foreground">HabitQuest</h1>
         <p className="mt-3 text-base leading-7 text-muted-foreground">
-          Primero autenticación real. Después producto real. Si no resolvés identidad, no podés
-          compartir dashboard, agente y canales sobre el mismo usuario.
+          Tu coach personal de bienestar. Armamos un plan realista para tu día, completás acciones positivas,
+          ganás puntos y desbloqueás recompensas que vos elegiste.
         </p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-border bg-background/70 p-4">
             <UserRound className="mb-2 h-5 w-5 text-primary" />
-            <p className="font-medium text-foreground">Demo user autenticado</p>
+            <p className="font-medium text-foreground">Sin registro complicado</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Entra con Supabase Auth sin pedir PII para la demo.
+              Comenzás en segundos. Sin formularios, sin contraseña.
             </p>
           </div>
           <div className="rounded-2xl border border-border bg-background/70 p-4">
             <ShieldCheck className="mb-2 h-5 w-5 text-primary" />
-            <p className="font-medium text-foreground">Profile bootstrap</p>
+            <p className="font-medium text-foreground">Tu historial seguro</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Si no existe profile, se crea al primer acceso server-side.
+              Tu plan, tus puntos y tus recompensas se guardan automáticamente.
             </p>
           </div>
         </div>
@@ -69,19 +69,14 @@ export function AuthCard({ isConfigured }: AuthCardProps) {
         {isConfigured ? (
           <div className="mt-8 space-y-3">
             <Button onClick={handleAnonymousSignIn} disabled={isLoading} size="lg" className="w-full">
-              {isLoading ? 'Entrando a la demo...' : 'Entrar con usuario demo'}
+              {isLoading ? 'Iniciando...' : 'Probar HabitQuest'}
             </Button>
-            <p className="text-sm text-muted-foreground">
-              Requiere tener habilitado anonymous sign-in en Supabase.
-            </p>
           </div>
         ) : (
           <div className="mt-8 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-            <p className="font-medium text-foreground">Falta configurar Supabase</p>
+            <p className="font-medium text-foreground">Servicio no disponible</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Definí <code>NEXT_PUBLIC_SUPABASE_URL</code> y{' '}
-              <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> en{' '}
-              <code>C:\PROYECTOS\VercelHack\.env.local</code>.
+              HabitQuest no está disponible en este momento. Por favor intentá más tarde.
             </p>
           </div>
         )}
