@@ -220,3 +220,210 @@ test('agent can log a fatigue check-in and rely on the adapted plan result', asy
   assert.equal(checkInCalls[0]?.intent, undefined)
   assert.match(result.text, /ajusté el plan/i)
 })
+
+test('agent can complete onboarding when user describes their goals', async () => {
+  const onboardingCalls: Array<{ goalIds: string[] }> = []
+
+  const model = new MockLanguageModelV3({
+    doGenerate: mockValues(
+      {
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'call-onboard',
+            toolName: 'completeOnboarding',
+            input: JSON.stringify({
+              goalIds: ['energy', 'focus'],
+              displayName: 'Tomi',
+            }),
+          },
+        ],
+        finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
+        usage: createUsage(),
+        warnings: [],
+      },
+      {
+        content: [
+          {
+            type: 'text',
+            text: 'Listo, Tomi. Configuré tu perfil con 2 objetivos y 10 actividades para arrancar.',
+          },
+        ],
+        finishReason: { unified: 'stop', raw: 'stop' },
+        usage: createUsage(),
+        warnings: [],
+      },
+    ),
+  })
+
+  const agent = createHabitQuestAgent({
+    model,
+    domainService: {
+      completeOnboarding: async (input) => {
+        onboardingCalls.push({ goalIds: input.goalIds })
+        return {
+          ok: true,
+          data: {
+            profileId: 'profile-1',
+            displayName: 'Tomi',
+            timezone: 'America/Santiago',
+            coachTone: 'collaborative',
+            goalCount: 2,
+            activityCount: 10,
+            rewardCount: 5,
+          },
+        }
+      },
+      generateDailyPlan: async () => { throw new Error('not used') },
+      logCheckIn: async () => { throw new Error('not used') },
+      completePlanItem: async () => { throw new Error('not used') },
+      redeemReward: async () => { throw new Error('not used') },
+      getTodaySummary: async () => { throw new Error('not used') },
+      updatePreferences: async () => { throw new Error('not used') },
+    },
+  })
+
+  const result = await agent.generate({
+    prompt: 'Quiero empezar. Me interesa tener más energía y concentración.',
+  })
+
+  assert.equal(onboardingCalls.length, 1)
+  assert.deepEqual(onboardingCalls[0]?.goalIds, ['energy', 'focus'])
+  assert.match(result.text, /configuré|actividades|objetivos/i)
+})
+
+test('agent can mark an activity as complete and report points awarded', async () => {
+  const completionCalls: Array<{ planItemId: string }> = []
+
+  const model = new MockLanguageModelV3({
+    doGenerate: mockValues(
+      {
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'call-complete',
+            toolName: 'completePlanItem',
+            input: JSON.stringify({
+              planItemId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            }),
+          },
+        ],
+        finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
+        usage: createUsage(),
+        warnings: [],
+      },
+      {
+        content: [
+          {
+            type: 'text',
+            text: '¡Excelente! Ganaste 20 puntos por caminar. Ya tenés 35 disponibles.',
+          },
+        ],
+        finishReason: { unified: 'stop', raw: 'stop' },
+        usage: createUsage(),
+        warnings: [],
+      },
+    ),
+  })
+
+  const agent = createHabitQuestAgent({
+    model,
+    domainService: {
+      completeOnboarding: async () => { throw new Error('not used') },
+      generateDailyPlan: async () => { throw new Error('not used') },
+      logCheckIn: async () => { throw new Error('not used') },
+      completePlanItem: async (input) => {
+        completionCalls.push({ planItemId: input.planItemId })
+        return {
+          ok: true,
+          data: {
+            planItemId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            completionId: 'completion-1',
+            walletTransactionId: 'wallet-1',
+            pointsAwarded: 20,
+            availablePoints: 35,
+            planStatus: 'active',
+          },
+        }
+      },
+      redeemReward: async () => { throw new Error('not used') },
+      getTodaySummary: async () => { throw new Error('not used') },
+      updatePreferences: async () => { throw new Error('not used') },
+    },
+  })
+
+  const result = await agent.generate({
+    prompt: 'Completé la actividad de caminar (item-1).',
+  })
+
+  assert.equal(completionCalls.length, 1)
+  assert.equal(completionCalls[0]?.planItemId, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+  assert.match(result.text, /20 puntos|35/i)
+})
+
+test('agent can redeem a reward and report remaining points', async () => {
+  const redeemCalls: Array<{ rewardId: string }> = []
+
+  const model = new MockLanguageModelV3({
+    doGenerate: mockValues(
+      {
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'call-redeem',
+            toolName: 'redeemReward',
+            input: JSON.stringify({
+              rewardId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            }),
+          },
+        ],
+        finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
+        usage: createUsage(),
+        warnings: [],
+      },
+      {
+        content: [
+          {
+            type: 'text',
+            text: '¡Dale! Canjeaste Gaming session. Te quedan 10 puntos.',
+          },
+        ],
+        finishReason: { unified: 'stop', raw: 'stop' },
+        usage: createUsage(),
+        warnings: [],
+      },
+    ),
+  })
+
+  const agent = createHabitQuestAgent({
+    model,
+    domainService: {
+      completeOnboarding: async () => { throw new Error('not used') },
+      generateDailyPlan: async () => { throw new Error('not used') },
+      logCheckIn: async () => { throw new Error('not used') },
+      completePlanItem: async () => { throw new Error('not used') },
+      redeemReward: async (input) => {
+        redeemCalls.push({ rewardId: input.rewardId })
+        return {
+          ok: true,
+          data: {
+            rewardId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            rewardName: 'Gaming session',
+            walletTransactionId: 'wallet-2',
+            remainingPoints: 10,
+          },
+        }
+      },
+      getTodaySummary: async () => { throw new Error('not used') },
+      updatePreferences: async () => { throw new Error('not used') },
+    },
+  })
+
+  const result = await agent.generate({
+    prompt: 'Quiero canjear mi recompensa de gaming (reward-1).',
+  })
+
+  assert.equal(redeemCalls.length, 1)
+  assert.equal(redeemCalls[0]?.rewardId, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')
+  assert.match(result.text, /gaming session|canjeaste|10 puntos/i)
+})
