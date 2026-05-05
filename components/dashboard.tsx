@@ -141,7 +141,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
           <div className="flex items-center gap-2">
             <Button className="hidden gap-2 sm:inline-flex" size="sm" onClick={scrollToCoachChat}>
               <MessageCircle className="h-4 w-4" />
-              Talk to coach
+              Hablar con el coach
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -151,7 +151,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>Cerrar sesión</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -169,20 +169,20 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
                 Tu coach personal
               </p>
               <h2 className="font-serif text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-                Manage today with a coach, not another rigid checklist.
+                Manejá el día con un coach, no con otra lista rígida.
               </h2>
               <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-                HabitQuest turns wellbeing goals into a flexible daily plan. Complete small positive actions,
-                earn points, and unlock personal rewards with intention.
+                HabitQuest convierte tus objetivos de bienestar en un plan diario flexible. Completá acciones
+                positivas, ganás puntos y desbloqueás tus recompensas favoritas.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Button className="gap-2" onClick={scrollToCoachChat}>
                   <MessageCircle className="h-4 w-4" />
-                  Start check-in
+                  Hacer check-in
                 </Button>
                 <Button variant="outline" className="gap-2 bg-background/60">
                   <CalendarCheck className="h-4 w-4" />
-                  View today&apos;s plan
+                  Ver el plan de hoy
                 </Button>
               </div>
             </div>
@@ -191,7 +191,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
           <Card className="border-border bg-card p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Plan progress</p>
+                <p className="text-sm text-muted-foreground">Progreso del plan</p>
                 <p className="mt-1 text-3xl font-bold text-foreground">{completionRate}%</p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-positive/10 text-positive">
@@ -207,8 +207,8 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
                 />
               </div>
               <p className="text-sm text-muted-foreground">
-                {completedItemsCount} completions logged today. Next reward:{' '}
-                <span className="font-medium text-foreground">{nextReward?.name ?? 'choose one'}</span>
+                {completedItemsCount} acciones completadas hoy. Próxima recompensa:{' '}
+                <span className="font-medium text-foreground">{nextReward?.name ?? 'elegí una'}</span>
               </p>
             </div>
           </Card>
@@ -225,10 +225,10 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-primary">Today</p>
-                <h2 className="font-serif text-2xl font-semibold text-foreground">Coach plan</h2>
+                <p className="text-sm font-medium text-primary">Hoy</p>
+                <h2 className="font-serif text-2xl font-semibold text-foreground">Plan del coach</h2>
                 <p className="text-sm text-muted-foreground">
-                  {initialSummary?.agentSummary ?? 'Duration-based actions. No fixed schedule.'}
+                  {initialSummary?.agentSummary ?? 'Acciones por duración. Sin horarios fijos.'}
                 </p>
               </div>
               <Target className="h-6 w-6 text-primary" />
@@ -236,10 +236,10 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
 
             {planItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                <p className="text-sm text-muted-foreground">No plan yet for today.</p>
+                <p className="text-sm text-muted-foreground">Todavía no hay plan para hoy.</p>
                 <Button size="sm" variant="outline" onClick={scrollToCoachChat}>
                   <MessageCircle className="mr-2 h-4 w-4" />
-                  Ask coach to plan your day
+                  Pedile al coach que planifique tu día
                 </Button>
               </div>
             ) : (
@@ -289,7 +289,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
                   <MessageCircle className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-primary">Latest check-in · {initialSummary.recentCheckIn.intent}</p>
+                  <p className="text-xs font-medium text-primary">Último check-in · {initialSummary.recentCheckIn.intent}</p>
                   <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{initialSummary.recentCheckIn.message}</p>
                 </div>
               </div>
@@ -302,11 +302,11 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
           <section>
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="font-serif text-2xl font-semibold text-foreground">Your rewards</h2>
+                <h2 className="font-serif text-2xl font-semibold text-foreground">Tus recompensas</h2>
                 <p className="text-sm text-muted-foreground">
                   {affordableRewards.length > 0
-                    ? `${affordableRewards.length} reward${affordableRewards.length > 1 ? 's' : ''} ready to redeem · ${availablePoints} pts available`
-                    : `${availablePoints} pts available · keep earning to unlock rewards`}
+                    ? `${affordableRewards.length} recompensa${affordableRewards.length > 1 ? 's' : ''} lista${affordableRewards.length > 1 ? 's' : ''} para canjear · ${availablePoints} pts disponibles`
+                    : `${availablePoints} pts disponibles · seguí sumando para desbloquear recompensas`}
                 </p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-treat/10 text-treat">
@@ -329,7 +329,7 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
                     {!canAfford && (
                       <div className="flex items-center gap-1.5 rounded-xl border border-dashed border-treat/30 px-3 py-2 text-xs font-medium text-treat/70">
                         <Lock className="h-3.5 w-3.5 shrink-0" />
-                        {deficit} pts to go — ask coach how to earn them
+                        Faltan {deficit} pts — preguntale al coach cómo ganarlos
                       </div>
                     )}
                   </motion.div>
@@ -349,20 +349,20 @@ export function Dashboard({ profileId, displayName, initialSummary, initialActiv
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'positive' | 'treats')}>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-serif text-2xl font-semibold text-foreground">Action marketplace</h2>
+                <h2 className="font-serif text-2xl font-semibold text-foreground">Catálogo de acciones</h2>
                 <p className="text-sm text-muted-foreground">
-                  Earn with positive actions. Redeem personal rewards when your wallet is ready.
+                  Sumá puntos con acciones positivas. Canjeá recompensas cuando estés listo.
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <TabsList className="grid w-full grid-cols-2 sm:w-[280px]">
                   <TabsTrigger value="positive" className="gap-2">
                     <Zap className="h-4 w-4" />
-                    Actions
+                    Acciones
                   </TabsTrigger>
                   <TabsTrigger value="treats" className="gap-2">
                     <Gift className="h-4 w-4" />
-                    Rewards
+                    Recompensas
                   </TabsTrigger>
                 </TabsList>
                 <AddActivityDialog />

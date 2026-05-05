@@ -101,10 +101,10 @@ export function BalanceMeter({ availablePoints, completedPoints, redeemedPoints,
 
       <div className="relative mt-5 rounded-2xl bg-muted/60 p-4 text-sm text-muted-foreground">
         {availablePoints >= 30
-          ? 'Buen ritmo: ya tenes margen para elegir una recompensa sin culpa.'
+          ? 'Buen ritmo: ya tenés margen para elegir una recompensa sin culpa.'
           : totalEarned > 0
-            ? 'Vas bien. Una accion corta mas puede desbloquear el proximo premio.'
-            : 'Arranca con una accion pequena. El objetivo es movimiento, no perfeccion.'}
+            ? 'Vas bien. Una acción corta más puede desbloquear el próximo premio.'
+            : 'Arrancá con una acción pequeña. El objetivo es el movimiento, no la perfección.'}
       </div>
     </Card>
   )

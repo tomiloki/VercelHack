@@ -61,7 +61,7 @@ export function ChatPanel({ displayName }: ChatPanelProps) {
       return 'El coach está pensando una respuesta.'
     }
 
-    return 'Chat simple conectado al agente real vía /api/chat.'
+    return 'Hablá cuando quieras, el coach está disponible.'
   }, [isWorking])
 
   const handleSubmit = (message: PromptInputMessage) => {
@@ -196,11 +196,11 @@ export function ChatPanel({ displayName }: ChatPanelProps) {
           </Card>
 
           <Card className="rounded-3xl border-border/80 p-4">
-            <p className="text-sm font-medium text-foreground">Qué valida esta issue</p>
+            <p className="text-sm font-medium text-foreground">¿Para qué sirve el chat?</p>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li>• UI real para enviar mensajes</li>
-              <li>• Respuestas del agente en la misma vista</li>
-              <li>• Markdown renderizado con AI Elements</li>
+              <li>• Pedile un plan para el día</li>
+              <li>• Contale cómo te sentís y adaptá el plan</li>
+              <li>• Marcá actividades completas y canjeá recompensas</li>
             </ul>
           </Card>
         </div>
