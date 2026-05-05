@@ -739,3 +739,62 @@ test('wallet balance subtracts redeems from earned points', () => {
 
   assert.equal(balance, 30)
 })
+
+test('redeemReward fails with insufficient_points when balance is below reward cost and a cheaper alternative is available', async () => {
+  const state: MockState = {
+    daily_plans: [],
+    daily_plan_items: [],
+    user_activities: [],
+    check_ins: [],
+    completions: [],
+    rewards: [
+      {
+        id: 'reward-expensive',
+        profile_id: 'profile-1',
+        name: 'Weekend getaway',
+        cost_points: 100,
+        status: 'active',
+      },
+      {
+        id: 'reward-affordable',
+        profile_id: 'profile-1',
+        name: 'Coffee break',
+        cost_points: 5,
+        status: 'active',
+      },
+    ],
+    wallet_transactions: [
+      {
+        id: 'wallet-1',
+        profile_id: 'profile-1',
+        type: 'earn',
+        points: 20,
+        reason: 'Previous activity',
+      },
+    ],
+  }
+
+  const service = createHabitQuestDomainService({
+    createClient: async () => createMockSupabaseClient(state) as never,
+    getProfileContext: async () => ({
+      isConfigured: true,
+      profile: {
+        id: 'profile-1',
+        user_id: 'user-1',
+        display_name: 'Tomi',
+        timezone: 'America/Santiago',
+        coach_tone: 'collaborative',
+        created_at: '2026-05-04T08:00:00.000Z',
+        updated_at: '2026-05-04T08:00:00.000Z',
+      },
+    }),
+  })
+
+  const result = await service.redeemReward({ rewardId: 'reward-expensive' })
+
+  assert.equal(result.ok, false)
+  if (result.ok) return
+
+  assert.equal(result.error.code, 'insufficient_points')
+  assert.equal(state.wallet_transactions.length, 1)
+})
