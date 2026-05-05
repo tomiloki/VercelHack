@@ -457,12 +457,13 @@ test('check-in adjustment selection prioritizes short low-friction activities', 
 })
 
 test('logCheckIn stores the detected intent and adapts pending items without deleting history', async () => {
+  const today = new Date().toISOString().split('T')[0]
   const state: MockState = {
     daily_plans: [
       {
         id: 'plan-1',
         profile_id: 'profile-1',
-        plan_date: '2026-05-04',
+        plan_date: today,
         status: 'active',
         agent_summary: 'Plan original',
         created_from: 'manual',
